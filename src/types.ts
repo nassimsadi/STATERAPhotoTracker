@@ -45,6 +45,8 @@ export const TARIF_PHOTO_EUR = 5;
 export type EtapePlan = {
   id: string;
   ordre: number;
+  ordreAuto?: boolean;    // ordre calculé par l'appli (itinéraire optimal) et non fourni par le fichier
+  nonLocalisee?: boolean; // adresse introuvable lors du calcul d'itinéraire
   date: string;           // AAAA-MM-JJ ('' si non planifiée)
   nom: string;            // nom/référence du site
   adresse: string;

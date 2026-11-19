@@ -2,6 +2,9 @@ import { useMemo, useRef, useState } from 'react';
 import { ajouterJours, jourISO, libelleJour, lundi } from './plan';
 import { importerFichierPlan } from './importPlan';
 import { avancement } from './regroupement';
+import { lienNavigation, localiserEtapes, optimiser, optimiserParJour } from './itineraire';
+import { positionUnique } from './geo';
+import { distanceTexte } from './format';
 import type { EtapePlan, PhotoRecord } from './types';
 
 type Props = {
@@ -19,6 +22,8 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
   const [jour, setJour] = useState(() => jourParDefaut(plan, aujourdhui));
   const [info, setInfo] = useState<{ txt: string; cls: string } | null>(null);
   const fichier = useRef<HTMLInputElement>(null);
+  const [calcul, setCalcul] = useState<string | null>(null);
+  const [navigation, setNavigation] = useState<{ lien: string; nb: number } | null>(null);
 
   const nbParEtape = useMemo(() => {
     const m = new Map<string, number>();
@@ -37,14 +42,56 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
       setVue(etapes.some((e) => e.date) ? 'jour' : 'tout');
       const dates = etapes.map((e) => e.date).filter(Boolean).sort();
       const sansDate = etapes.length - dates.length;
+      const resume = `Plan importé : ${etapes.length} étape(s)`
+        + (dates.length ? (dates[0] === dates[dates.length - 1] ? `, le ${libelleJour(dates[0])}` : `, du ${libelleJour(dates[0])} au ${libelleJour(dates[dates.length - 1])}`) : '')
+        + (sansDate ? ` · ${sansDate} sans date (affichées chaque jour)` : '');
+      setInfo({ txt: resume, cls: 'vert' });
+      setNavigation(null);
+      // Localisation des adresses, puis ordre de passage optimal pour chaque journée sans « Ordre » fourni.
+      setCalcul('Localisation des adresses…');
+      const localisees = await localiserEtapes(etapes, (f, t) => setCalcul(`Localisation des adresses : ${f}/${t}…`));
+      const optimise = optimiserParJour(localisees);
+      onImporter(optimise);
+      setCalcul(null);
+      const nonLoc = optimise.filter((e) => e.nonLocalisee).length;
+      const auto = optimise.some((e) => e.ordreAuto);
       setInfo({
-        txt: `Plan importé : ${etapes.length} étape(s)`
-          + (dates.length ? `, du ${libelleJour(dates[0])} au ${libelleJour(dates[dates.length - 1])}` : '')
-          + (sansDate ? ` · ${sansDate} sans date (affichées chaque jour)` : ''),
+        txt: resume + (auto ? ' · ordre de passage optimisé' : '')
+          + (nonLoc ? ` · ${nonLoc} adresse(s) introuvable(s), à vérifier` : ''),
+        cls: nonLoc ? 'orange' : 'vert',
+      });
+    } catch (e) {
+      setCalcul(null);
+      setInfo({ txt: e instanceof Error ? e.message : String(e), cls: 'rouge' });
+    }
+  };
+
+  /** Itinéraire optimal depuis la position de l'intervenant, pour les étapes restantes du jour affiché. */
+  const itineraireOptimal = async () => {
+    const restantes = duJour.filter((e) => !nbParEtape.get(e.id));
+    const faites = duJour.filter((e) => nbParEtape.get(e.id)).sort((a, b) => a.ordre - b.ordre);
+    if (!restantes.length) return setInfo({ txt: 'Toutes les étapes de ce jour ont déjà été photographiées.', cls: 'vert' });
+    try {
+      setCalcul('Recherche de votre position…');
+      const pos = await positionUnique().catch(() => null);
+      setCalcul('Calcul de l\'itinéraire optimal…');
+      const localisees = await localiserEtapes(restantes);
+      const { ordre, distanceM } = optimiser(localisees, pos ?? undefined);
+      const nouveauxOrdres = new Map<string, EtapePlan>();
+      [...faites, ...ordre].forEach((e, i) => nouveauxOrdres.set(e.id, { ...e, ordre: i + 1, ordreAuto: true }));
+      onImporter(plan.map((e) => nouveauxOrdres.get(e.id) ?? e));
+      setNavigation({ lien: lienNavigation(ordre), nb: ordre.length });
+      const nonLoc = ordre.filter((e) => e.latitude == null).length;
+      setInfo({
+        txt: `Itinéraire optimisé${pos ? ' depuis votre position' : ''} : ${ordre.length} étape(s) restante(s), environ ${distanceTexte(distanceM)} à vol d'oiseau.`
+          + (pos ? '' : ' (Position GPS indisponible : départ depuis la première étape.)')
+          + (nonLoc ? ` ${nonLoc} adresse(s) introuvable(s) placée(s) à la fin.` : ''),
         cls: 'vert',
       });
     } catch (e) {
-      setInfo({ txt: e instanceof Error ? e.message : String(e), cls: 'rouge' });
+      setInfo({ txt: `Calcul impossible : ${e instanceof Error ? e.message : String(e)}`, cls: 'rouge' });
+    } finally {
+      setCalcul(null);
     }
   };
 
@@ -60,7 +107,9 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
   const groupes = useMemo(() => {
     const m = new Map<string, EtapePlan[]>();
     visibles.forEach((e) => m.set(e.date, [...(m.get(e.date) ?? []), e]));
-    return [...m.entries()].sort(([a], [b]) => (a || '9').localeCompare(b || '9'));
+    return [...m.entries()]
+      .sort(([a], [b]) => (a || '9').localeCompare(b || '9'))
+      .map(([d, l]) => [d, [...l].sort((a, b) => a.ordre - b.ordre)] as [string, EtapePlan[]]);
   }, [visibles]);
 
   const entreeFichier = (
@@ -77,10 +126,11 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
           <h2>Aucun plan de route</h2>
           <p className="aide">
             Importez le fichier <b>Excel</b> transmis par STATERA Networks. Colonnes reconnues :
-            <b> Date, Ordre, Site, Adresse, Code postal, Ville, Latitude, Longitude, Consigne</b>.
-            Seules Adresse, Code postal et Ville sont obligatoires.
+            <b> Date, Site, Adresse, Code postal, Ville, Consigne</b> (et facultativement Ordre, Latitude, Longitude).
+            Seules Adresse, Code postal et Ville sont obligatoires. Sans colonne Ordre, l'appli calcule l'itinéraire optimal.
           </p>
           {info && <div className={`alerte ${info.cls}`}>{info.txt}</div>}
+          {calcul && <div className="alerte gris">{calcul}</div>}
           <button className="btn plein" onClick={() => fichier.current?.click()}>Importer le plan de route (Excel)</button>
           <a className="btn contour" href={`${import.meta.env.BASE_URL}plan-de-route-modele.xlsx`} download>Télécharger le modèle Excel</a>
         </div>
@@ -119,7 +169,18 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
         </div>
       )}
 
+      {vue === 'jour' && duJour.length > 1 && (
+        <div className="actions">
+          <button className="btn plein petit" disabled={!!calcul} onClick={itineraireOptimal}>🧭 Itinéraire optimal depuis ma position</button>
+        </div>
+      )}
+      {calcul && <div className="alerte gris">{calcul}</div>}
       {info && <div className={`alerte ${info.cls}`}>{info.txt}</div>}
+      {navigation && vue === 'jour' && (
+        <a className="btn contour" href={navigation.lien} target="_blank" rel="noreferrer">
+          ▶ Lancer la navigation (Google Maps){navigation.nb > 10 ? ' – 10 premières étapes' : ''}
+        </a>
+      )}
       {visibles.length === 0 && (
         <div className="carte">
           <p className="aide centre">Aucune étape prévue {vue === 'semaine' ? 'cette semaine' : 'ce jour'}.</p>
@@ -145,6 +206,7 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
                     <div className="gras">{e.adresse || '—'}</div>
                     <div className="aide">{[e.codePostal, e.ville].filter(Boolean).join(' ')}</div>
                     {e.consigne && <div className="consigne">⚠︎ {e.consigne}</div>}
+                    {e.nonLocalisee && <div className="consigne">Adresse introuvable : vérifiez-la (itinéraire approximatif).</div>}
                     {nb > 0 && <div className="fait">{nb} photo{nb > 1 ? 's' : ''} prise{nb > 1 ? 's' : ''}</div>}
                   </div>
                 </div>

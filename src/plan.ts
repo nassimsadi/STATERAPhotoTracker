@@ -48,7 +48,7 @@ export function lireCsv(texte: string): string[][] {
 }
 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z]/g, '');
-const ALIAS: Record<keyof Omit<EtapePlan, 'id'>, string[]> = {
+const ALIAS: Record<keyof Omit<EtapePlan, 'id' | 'ordreAuto' | 'nonLocalisee'>, string[]> = {
   date: ['date', 'jour', 'datedepassage', 'dateintervention', 'dateprevue', 'planification'],
   ordre: ['ordre', 'n', 'no', 'num', 'numero', 'rang', 'etape'],
   nom: ['site', 'nom', 'nomsite', 'reference', 'ref', 'codesite', 'identifiant'],
@@ -129,6 +129,7 @@ export function importerLignes(brut: unknown[][]): EtapePlan[] {
     .map((l, i) => ({
       id: `${Date.now()}_${i}`,
       ordre: nombre(v(l, 'ordre')) ?? i + 1,
+      ordreAuto: nombre(v(l, 'ordre')) == null,
       date: lireDate(v(l, 'date')),
       nom: v(l, 'nom'),
       adresse: v(l, 'adresse'),
