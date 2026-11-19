@@ -4,12 +4,13 @@ import { dateFR, horodatageFichier, nomSur } from './format';
 import { euros } from './rapport';
 import { statutFinal, totaux, type TourneeImportee } from './validationDb';
 import { TARIF_PHOTO_EUR } from './types';
+import { CLIENT_VIDE, integrerDonnees, type CoordonneesClient } from './facturation';
 
 const SARCELLE: [number, number, number] = [46, 94, 88];
 const LIB = { validee_auto: 'Validée (auto)', validee: 'Validée (responsable)', refusee: 'Refusée', en_attente: 'En attente' };
 
 /** Relevé de validation à transmettre (intervenant, comptabilité). */
-export function construireReleve(t: TourneeImportee, responsable: string, logo?: { dataUrl: string; ratio: number }): File {
+export function construireReleve(t: TourneeImportee, responsable: string, logo?: { dataUrl: string; ratio: number }, client: CoordonneesClient = CLIENT_VIDE): File {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const L = 210, M = 15;
   const tt = totaux(t, TARIF_PHOTO_EUR);
@@ -73,6 +74,24 @@ export function construireReleve(t: TourneeImportee, responsable: string, logo?:
   doc.setDrawColor(150, 150, 150); doc.setLineWidth(0.3); doc.line(L - M - 80, y, L - M, y);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(107, 114, 112);
   doc.text(`Visa du responsable : ${responsable}`, L - M - 80, y + 5);
+
+  // Facturation : montant à facturer + données lisibles par l'appli de l'intervenant
+  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 34;
+  if (y > 262) { doc.addPage(); y = 25; }
+  doc.setFillColor(234, 242, 240); doc.roundedRect(M, y, L - 2 * M, 22, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor(...SARCELLE);
+  doc.text(`Bon pour facturation : ${euros(tt.montant)} HT (${tt.payees} photo(s) x ${euros(TARIF_PHOTO_EUR)})`, M + 4, y + 7);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(80, 80, 80);
+  doc.text(doc.splitTextToSize("L'intervenant importe ce relevé dans STATERA PhotoTracker (onglet Réalisations > Facturer un relevé) "
+    + `pour générer sa facture, adressée à ${client.raisonSociale || 'STATERA Networks'}.`, L - 2 * M - 8), M + 4, y + 13);
+  const payees = t.photos.filter((p) => ['validee', 'validee_auto'].includes(statutFinal(t, p))).sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+  integrerDonnees(doc, {
+    format: 'statera-releve-v1', id: `${horodatageFichier(maintenant)}-${nomSur(t.intervenant)}`, intervenant: t.intervenant, responsable,
+    etabliLe: maintenant, periode: { debut: dates[0] ?? t.creeLe, fin: dates[dates.length - 1] ?? t.creeLe }, archive: t.nomZip,
+    tarif: TARIF_PHOTO_EUR, nbPayees: tt.payees, montant: tt.montant, refusees: tt.refusees, enAttente: tt.enAttente,
+    photos: payees.map((p) => ({ date: p.dateISO, ref: p.siteRef ?? '', adresse: p.adresse, codePostal: p.codePostal, ville: p.ville })),
+    client,
+  });
 
   return new File([doc.output('blob')], `Releve_validation_${nomSur(t.intervenant)}_${horodatageFichier(maintenant)}.pdf`, { type: 'application/pdf' });
 }

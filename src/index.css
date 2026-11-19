@@ -248,3 +248,15 @@ h1, h2, h3, h4 { margin: 0; }
 
 .install-mini { align-self: center; margin: 10px 16px 0; background: #FFF8E6; border: 1px solid #F1D99B; color: var(--texte);
   border-radius: 20px; padding: 8px 16px; font-weight: 700; font-size: 14px; }
+
+/* Photos inhabituelles */
+.alerte-bouton { border: 0; text-align: left; cursor: pointer; font: inherit; font-weight: 700; }
+.photo-verif.bizarre { border: 3px solid #E07B00; scroll-margin-top: 80px; }
+.bizarre-raisons { background: #FFF1DE; color: #8A4B00; font-weight: 800; font-size: 14px; border-radius: 10px; padding: 8px 10px; }
+.photo-verif.clignote { animation: clignote 1s ease-in-out 3; }
+@keyframes clignote { 50% { box-shadow: 0 0 0 6px rgba(224, 123, 0, .45); } }
+
+/* Facturation */
+.facturation h3 { font-size: 17px; }
+.releve-apercu { background: var(--sarcelle-fond); border-color: #CFE2DD; gap: 4px; }
+.champ select { width: 100%; border: 1px solid var(--bord); border-radius: 12px; padding: 12px 10px; font-size: 15px; background: #FAFBFB; color: var(--texte); }

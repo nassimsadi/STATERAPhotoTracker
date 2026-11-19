@@ -5,6 +5,7 @@ import { euros } from './rapport';
 import { dateFR } from './format';
 import { libelleJour } from './plan';
 import type { PhotoRecord, Rapport } from './types';
+import Facturation from './Facturation';
 
 type Props = { rapports: Rapport[]; photos: PhotoRecord[]; onSupprimer: (r: Rapport) => void; onMajRapport: (r: Rapport) => void };
 
@@ -65,6 +66,7 @@ export default function Realisations({ rapports, photos, onSupprimer, onMajRappo
   if (!rapports.length) {
     return (
       <main className="contenu">
+        <Facturation />
         <div className="carte">
           <h2>Aucune tournée clôturée</h2>
           <p className="aide">À la fin de chaque journée, faites « Fin de tournée » : la journée est alors clôturée et rangée ici,
@@ -92,6 +94,7 @@ export default function Realisations({ rapports, photos, onSupprimer, onMajRappo
 
   return (
     <main className="contenu">
+      <Facturation />
       <p className="stats">{rapports.length} tournée(s) clôturée(s){espace ? ` · ${espace}` : ''}</p>
       {message && <div className={`alerte ${message.cls}`}>{message.txt}</div>}
       {[...mois.entries()].map(([m, liste]) => (

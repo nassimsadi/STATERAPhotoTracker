@@ -4,12 +4,14 @@ import { construireReleve } from './releve';
 import { partagerFichier } from './partage';
 import { dateFR, distanceTexte, gpsTexte } from './format';
 import {
-  archiverPdf, chargerTournees, enregistrerTournees, importerZip, lireImage, statutFinal, supprimerTournee, totaux,
+  archiverPdf, chargerClientFacturation, chargerTournees, enregistrerTournees, importerZip, lireImage, statutFinal, supprimerTournee, totaux,
   type Decision, type TourneeImportee,
 } from './validationDb';
 import { TARIF_PHOTO_EUR, type PhotoRecord } from './types';
 import { get, set } from 'idb-keyval';
 import RapportClient from './RapportClient';
+import { anomalies } from './anomalies';
+import CoordonneesStatera from './CoordonneesStatera';
 import DocumentsPdf from './DocumentsPdf';
 import Installation from './Installation';
 
@@ -76,6 +78,7 @@ export default function Validation() {
         {message && <div className={`alerte ${message.cls}`}>{message.txt}</div>}
 
         <button className="btn contour" onClick={() => setDocuments(true)}>📄 Documents PDF (tout télécharger)</button>
+        <CoordonneesStatera />
         <div className="carte">
           <h2>Rapport donneur d'ordre</h2>
           <p className="aide">Compare le plan de route transmis avec les tournées reçues, puis prépare le rapport final
@@ -122,6 +125,42 @@ function DetailTournee({ t, onChange, onRetour }: { t: TourneeImportee; onChange
     .filter((p) => filtre === 'toutes' || p.conformite !== 'conforme')
     .sort((a, b) => a.dateISO.localeCompare(b.dateISO));
 
+  // Photos inhabituelles (parmi celles en attente de décision)
+  const enAttente = t.photos.filter((p) => statutFinal(t, p) === 'en_attente');
+  const bizarres = new Map(enAttente.map((p) => [p.id, anomalies(p, t.photos)] as const).filter(([, r]) => r.length));
+  const [surbrillance, setSurbrillance] = useState(false);
+
+  const allerAuxBizarres = () => {
+    setFiltre('a_verifier');
+    setSurbrillance(true);
+    setTimeout(() => {
+      const premier = document.querySelector('.photo-verif.bizarre');
+      premier?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  };
+
+  /** Valide d'un coup toutes les photos en attente, sauf les inhabituelles qu'on va examiner. */
+  const toutValider = () => {
+    if (!enAttente.length) return alert('Aucune photo en attente de décision.');
+    const normales = enAttente.filter((p) => !bizarres.has(p.id));
+    if (bizarres.size) {
+      const raisons = [...new Set([...bizarres.values()].flat())].slice(0, 5).map((x) => `• ${x}`).join('\n');
+      const ok = confirm(
+        `⚠️ ${bizarres.size} photo(s) inhabituelle(s) à examiner avant validation :\n${raisons}\n\n`
+        + (normales.length
+          ? `OK : valider les ${normales.length} autre(s) photo(s) et aller voir les photos inhabituelles.\nAnnuler : ne rien valider.`
+          : 'OK : aller voir les photos inhabituelles.'),
+      );
+      if (!ok) return;
+    } else if (!confirm(`Valider les ${normales.length} photo(s) en attente ?`)) return;
+    const maintenant = new Date().toISOString();
+    const decisions = { ...t.decisions };
+    normales.forEach((p) => { decisions[p.id] = { statut: 'validee', commentaire: '', dateISO: maintenant }; });
+    onChange({ ...t, decisions });
+    setReleve(null);
+    if (bizarres.size) allerAuxBizarres();
+  };
+
   const decider = (p: PhotoRecord, d: Decision | null) => {
     const decisions = { ...t.decisions };
     if (d) decisions[p.id] = d; else delete decisions[p.id];
@@ -133,7 +172,9 @@ function DetailTournee({ t, onChange, onRetour }: { t: TourneeImportee; onChange
     if (!responsable.trim()) return alert('Indiquez votre nom (visa du responsable).');
     if (tt.enAttente && !confirm(`${tt.enAttente} photo(s) sont encore en attente : elles seront indiquées « En attente » et non payées. Continuer ?`)) return;
     await set('statera-responsable', responsable.trim());
-    const f = construireReleve(t, responsable.trim(), await chargerLogoPdf());
+    const client = await chargerClientFacturation();
+    if (!client.adresse && !confirm("Les coordonnées de facturation STATERA ne sont pas renseignées (page d'accueil de l'espace validation) : la facture de l'intervenant sera incomplète. Continuer ?")) return;
+    const f = construireReleve(t, responsable.trim(), await chargerLogoPdf(), client);
     await archiverPdf('releve', f, `${t.intervenant} – tournée envoyée le ${dateFR(t.creeLe).slice(0, 10)}`);
     setReleve(f);
   };
@@ -149,6 +190,15 @@ function DetailTournee({ t, onChange, onRetour }: { t: TourneeImportee; onChange
         </div>
         <div className="kpi total"><b>{euros(tt.montant)}</b><span>à payer ({tt.payees} × {euros(TARIF_PHOTO_EUR)})</span></div>
 
+        {enAttente.length > 0 && (
+          <button className="btn plein" onClick={toutValider}>✓ Tout valider ({enAttente.length} en attente)</button>
+        )}
+        {bizarres.size > 0 && (
+          <button className="alerte orange alerte-bouton" onClick={allerAuxBizarres}>
+            ⚠️ {bizarres.size} photo(s) inhabituelle(s) à examiner — voir ↓
+          </button>
+        )}
+
         <div className="segment">
           <button className={filtre === 'a_verifier' ? 'actif' : ''} onClick={() => setFiltre('a_verifier')}>À vérifier ({tt.aVerifier})</button>
           <button className={filtre === 'toutes' ? 'actif' : ''} onClick={() => setFiltre('toutes')}>Toutes ({tt.total})</button>
@@ -162,7 +212,10 @@ function DetailTournee({ t, onChange, onRetour }: { t: TourneeImportee; onChange
             ? `https://www.google.com/maps/dir/?api=1&origin=${p.latitude},${p.longitude}&destination=${p.latitudeSite},${p.longitudeSite}`
             : p.latitude != null ? `https://www.google.com/maps/search/?api=1&query=${p.latitude},${p.longitude}` : null;
           return (
-            <article key={p.id} className={`carte photo-verif ${s}`}>
+            <article key={p.id} className={`carte photo-verif ${s} ${bizarres.has(p.id) ? 'bizarre' : ''} ${bizarres.has(p.id) && surbrillance ? 'clignote' : ''}`}>
+              {bizarres.has(p.id) && (
+                <div className="bizarre-raisons">⚠️ Photo inhabituelle : {bizarres.get(p.id)!.join(' · ')}</div>
+              )}
               <button className="img-bouton" onClick={() => setGrande(p)}><ImageValidation cle={t.cle} id={p.id} /></button>
               <div className="gras">{p.adresse}</div>
               <div className="aide">{p.codePostal} {p.ville} · {p.departement} · {dateFR(p.dateISO)}</div>
@@ -198,7 +251,7 @@ function DetailTournee({ t, onChange, onRetour }: { t: TourneeImportee; onChange
           {!releve ? (
             <button className="btn plein" onClick={generer}>Générer le relevé de validation (PDF)</button>
           ) : (
-            <button className="btn plein" onClick={() => partagerFichier(releve, 'Relevé de validation', `Relevé de validation – ${t.intervenant} : ${euros(tt.montant)} à payer.`)}>
+            <button className="btn plein" onClick={() => partagerFichier(releve, 'Relevé de validation', `Relevé de validation – ${t.intervenant} : ${euros(tt.montant)} HT bon pour facturation. Importez ce relevé dans STATERA PhotoTracker (onglet Réalisations > Facturer un relevé) pour générer votre facture.`)}>
               Envoyer le relevé (mail, Drive…)
             </button>
           )}

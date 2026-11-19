@@ -1,4 +1,5 @@
 // Données de l'espace « Validation responsable » (stockées sur l'appareil du responsable).
+import { CLIENT_VIDE, type CoordonneesClient } from './facturation';
 import { createStore, del, get, set } from 'idb-keyval';
 import JSZip from 'jszip';
 import type { PhotoRecord } from './types';
@@ -91,3 +92,7 @@ export async function supprimerDocument(id: string) {
   await del(`doc/${id}`, images);
   await set('documents', (await chargerDocuments()).filter((d) => d.id !== id), meta);
 }
+
+// ---------- Coordonnées de facturation STATERA (incluses dans les relevés) ----------
+export const chargerClientFacturation = async () => ({ ...CLIENT_VIDE, ...((await get<CoordonneesClient>('clientFacturation', meta)) ?? {}) });
+export const enregistrerClientFacturation = (c: CoordonneesClient) => set('clientFacturation', c, meta);
