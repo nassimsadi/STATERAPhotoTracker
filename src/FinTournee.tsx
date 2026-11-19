@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ecrireBlob, ecrireIntervenant, lireBlob, lireIntervenant } from './db';
+import { ecrireBlob, ecrireIntervenant, lireIntervenant } from './db';
 import { creerZip } from './exportZip';
 import { partagerFichier } from './partage';
 import { bilanTournee, chargerLogoPdf, construirePdf, euros } from './rapport';
-import { dateFR, horodatageFichier } from './format';
+import { dateFR, horodatageFichier, nomSur } from './format';
 import type { PhotoRecord, Rapport } from './types';
 
 type Props = {
@@ -12,14 +12,16 @@ type Props = {
   avancementPlan?: { faites: number; total: number; pct: number };
   onCloturer: (r: Rapport) => Promise<void>;
   onRetour: () => void;
+  onRealisations: () => void;
 };
 
-export default function FinTournee({ photosTournee, rapports, avancementPlan, onCloturer, onRetour }: Props) {
+export default function FinTournee({ photosTournee, rapports, avancementPlan, onCloturer, onRetour, onRealisations }: Props) {
   const [intervenant, setIntervenant] = useState('');
   useEffect(() => { lireIntervenant().then((v) => setIntervenant((actuel) => actuel || v)); }, []);
   const bilan = useMemo(() => bilanTournee(photosTournee, intervenant.trim()), [photosTournee, intervenant]);
 
   const [zip, setZip] = useState<File | null>(null);
+  const [prepare, setPrepare] = useState<{ r: Rapport; f: File } | null>(null);
   const [zipEnvoye, setZipEnvoye] = useState(false);
   const [pdf, setPdf] = useState<{ f: File; r: Rapport } | null>(null);
   const [occupe, setOccupe] = useState<string | null>(null);
@@ -38,7 +40,13 @@ export default function FinTournee({ photosTournee, rapports, avancementPlan, on
     setOccupe('zip');
     try {
       await ecrireIntervenant(intervenant.trim());
-      setZip(await creerZip(photosTournee, `Tournee_${intervenant.trim()}_${horodatageFichier(new Date().toISOString()).slice(0, 8)}`, intervenant.trim()));
+      // Le rapport PDF est établi dès maintenant et joint au .zip envoyé au responsable
+      const maintenant = new Date().toISOString();
+      const titre = `Tournee_${intervenant.trim()}_${horodatageFichier(maintenant).slice(0, 8)}`;
+      const r: Rapport = { ...bilan, id: horodatageFichier(maintenant), dateISO: maintenant, zipNom: `${nomSur(titre)}.zip`, avancementPlan };
+      const f = construirePdf(r, photosTournee, await chargerLogoPdf());
+      setPrepare({ r, f });
+      setZip(await creerZip(photosTournee, titre, intervenant.trim(), f));
     } catch (e) {
       setMessage({ txt: `Export impossible : ${String(e)}`, cls: 'rouge' });
     } finally {
@@ -57,11 +65,12 @@ export default function FinTournee({ photosTournee, rapports, avancementPlan, on
     if (!zip || !verifierNom()) return;
     setOccupe('pdf');
     try {
-      const maintenant = new Date().toISOString();
-      const r: Rapport = { ...bilan, id: horodatageFichier(maintenant), dateISO: maintenant, zipNom: zip.name, avancementPlan };
-      const f = construirePdf(r, photosTournee, await chargerLogoPdf());
+      if (!prepare) return;
+      const { r, f } = prepare;
       await ecrireBlob(`rapport:${r.id}`, f);
       r.pdfUri = `rapport:${r.id}`;
+      await ecrireBlob(`zip:${r.id}`, zip);     // conservé pour l'onglet Réalisations
+      r.zipCle = `zip:${r.id}`;
       await onCloturer(r);       // les photos de la tournée sont marquées comme clôturées
       setPdf({ f, r });
     } catch (e) {
@@ -73,10 +82,6 @@ export default function FinTournee({ photosTournee, rapports, avancementPlan, on
 
   const partagerPdf = (f: File) => partagerFichier(f, 'Rapport de fin de tournée', `Rapport de fin de tournée – ${intervenant}`);
 
-  const rouvrir = async (r: Rapport) => {
-    const b = r.pdfUri ? await lireBlob(r.pdfUri) : undefined;
-    if (b) await partagerPdf(new File([b], `Rapport_${r.id}.pdf`, { type: 'application/pdf' }));
-  };
 
   // Tournée clôturée : écran final
   if (pdf) {
@@ -87,7 +92,8 @@ export default function FinTournee({ photosTournee, rapports, avancementPlan, on
           <div className="alerte vert">Rapport généré : {pdf.r.nbSites} site(s), {pdf.r.nbPhotos} photo(s), {euros(pdf.r.montant)} validés{pdf.r.nbAVerifier ? `, ${pdf.r.nbAVerifier} photo(s) à vérifier` : ''}.</div>
           <Etape n={3} titre="Déposer le rapport PDF" detail="Choisissez votre outil de reporting dans le menu Partager : Drive, OneDrive, SharePoint, Mail…" />
           <button className="btn plein" onClick={() => partagerPdf(pdf.f)}>Partager / enregistrer le PDF</button>
-          <button className="btn contour" onClick={onRetour}>Terminer</button>
+          <button className="btn contour" onClick={onRealisations}>Voir dans « Réalisations »</button>
+          <button className="btn texte" onClick={onRetour}>Terminer</button>
         </main>
       </div>
     );
@@ -127,15 +133,7 @@ export default function FinTournee({ photosTournee, rapports, avancementPlan, on
         {vide && <p className="aide centre">Aucune photo dans la tournée en cours.</p>}
 
         {rapports.length > 0 && (
-          <>
-            <h3 className="section">Rapports précédents</h3>
-            {[...rapports].reverse().map((r) => (
-              <button key={r.id} className="carte rapport" onClick={() => rouvrir(r)}>
-                <span><b>{dateFR(r.dateISO).slice(0, 10)} · {r.intervenant}</b><small>{r.nbSites} sites · {r.nbPhotos} photos · {euros(r.montant)}</small></span>
-                <span className="lien">PDF ↗</span>
-              </button>
-            ))}
-          </>
+          <button className="btn contour" onClick={onRealisations}>Voir les tournées clôturées ({rapports.length})</button>
         )}
       </main>
     </div>

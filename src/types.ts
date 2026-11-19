@@ -38,6 +38,7 @@ export type Rapport = {
   montantEnAttente?: number;
   zipNom: string;
   pdfUri?: string;
+  zipCle?: string;        // .zip de la tournée conservé sur l'appareil (onglet Réalisations)
   avancementPlan?: { faites: number; total: number; pct: number };
 };
 

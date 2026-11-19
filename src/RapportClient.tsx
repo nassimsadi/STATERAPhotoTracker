@@ -6,7 +6,7 @@ import { LIBELLE_STATUT, photosRecues, rapprocher, type StatutSite } from './rap
 import { partagerFichier } from './partage';
 import { dateFR } from './format';
 import {
-  chargerInfosClient, chargerPlanClient, enregistrerInfosClient, enregistrerPlanClient, type InfosClient, type TourneeImportee,
+  archiverPdf, chargerInfosClient, chargerPlanClient, enregistrerInfosClient, enregistrerPlanClient, type InfosClient, type TourneeImportee,
 } from './validationDb';
 import type { EtapePlan } from './types';
 
@@ -55,6 +55,7 @@ export default function RapportClient({ tournees, onRetour }: { tournees: Tourne
       const opts = { ...infos, avecPhotos, avecHorsPlan };
       setEtat('Génération du rapport PDF…');
       const pdf = await construirePdfClient(resultat, opts, await chargerLogoPdf(), setEtat);
+      await archiverPdf('rapport_client', pdf, `${infos.donneurOrdre}${infos.reference ? ` – ${infos.reference}` : ''} (${resultat.synthese.taux} % réalisé)`);
       const zip = avecZip ? await construireLivrable(resultat, opts, pdf, setEtat) : undefined;
       setLivrables({ pdf, zip });
     } catch (e) {

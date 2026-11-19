@@ -33,6 +33,11 @@ export async function importerZip(f: File): Promise<TourneeImportee> {
     const img = zip.file(p.cheminZip);
     if (img) await set(`${cle}/${p.id}`, new Blob([await img.async('arraybuffer')], { type: 'image/jpeg' }), images);
   }
+  for (const pdf of zip.file(/^[^/]+\.pdf$/)) {
+    const b = await pdf.async('arraybuffer');
+    await archiverPdf('rapport_intervenant', new File([b], pdf.name, { type: 'application/pdf' }),
+      `${d.intervenant || 'Intervenant'} – tournée envoyée le ${new Date(d.creeLe).toLocaleDateString('fr-FR')}`);
+  }
   return { cle, intervenant: d.intervenant || 'Intervenant', creeLe: d.creeLe, nomZip: f.name, photos: d.photos, decisions: {} };
 }
 
@@ -60,3 +65,29 @@ export const enregistrerPlanClient = (p: import('./types').EtapePlan[]) => set('
 export type InfosClient = { donneurOrdre: string; reference: string; redacteur: string; nomFichierPlan: string };
 export const chargerInfosClient = async () => (await get<InfosClient>('infosClient', meta)) ?? { donneurOrdre: '', reference: '', redacteur: '', nomFichierPlan: '' };
 export const enregistrerInfosClient = (i: InfosClient) => set('infosClient', i, meta);
+
+// ---------- Documents PDF (archive du responsable) ----------
+export type TypeDocument = 'rapport_intervenant' | 'releve' | 'rapport_client';
+export type DocumentPdf = { id: string; type: TypeDocument; nom: string; titre: string; dateISO: string; taille: number };
+export const LIBELLE_TYPE: Record<TypeDocument, string> = {
+  rapport_intervenant: 'Rapports de fin de tournée (intervenants)',
+  releve: 'Relevés de validation',
+  rapport_client: "Rapports donneur d'ordre",
+};
+export const chargerDocuments = async () => (await get<DocumentPdf[]>('documents', meta)) ?? [];
+export const lireDocument = (id: string) => get<Blob>(`doc/${id}`, images);
+
+/** Archive un PDF (remplace un document de même nom). */
+export async function archiverPdf(type: TypeDocument, f: File, titre: string): Promise<void> {
+  const docs = await chargerDocuments();
+  const existant = docs.find((d) => d.nom === f.name && d.type === type);
+  const id = existant?.id ?? `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  await set(`doc/${id}`, f, images);
+  const d: DocumentPdf = { id, type, nom: f.name, titre, dateISO: new Date().toISOString(), taille: f.size };
+  await set('documents', [d, ...docs.filter((x) => x.id !== id)], meta);
+}
+
+export async function supprimerDocument(id: string) {
+  await del(`doc/${id}`, images);
+  await set('documents', (await chargerDocuments()).filter((d) => d.id !== id), meta);
+}

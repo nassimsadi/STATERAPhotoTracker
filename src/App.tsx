@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Capture from './Capture';
 import Plan from './Plan';
 import TourneeJour from './TourneeJour';
+import Realisations from './Realisations';
 import Photos from './Photos';
 import FinTournee from './FinTournee';
 import Installation from './Installation';
@@ -15,7 +16,7 @@ type Ecran = { nom: 'accueil' } | { nom: 'capture'; etape: EtapePlan | null; cle
 
 export default function App() {
   const [ecran, setEcran] = useState<Ecran>({ nom: 'accueil' });
-  const [onglet, setOnglet] = useState<'plan' | 'tournee' | 'photos'>('plan');
+  const [onglet, setOnglet] = useState<'plan' | 'tournee' | 'photos' | 'realisations'>('plan');
   const [photos, setPhotos] = useState<PhotoRecord[]>([]);
   const [plan, setPlan] = useState<EtapePlan[]>([]);
   const [rapports, setRapports] = useState<Rapport[]>([]);
@@ -53,6 +54,17 @@ export default function App() {
     setPhotos(liste); setRapports(rs);
     await Promise.all([enregistrerPhotos(liste), enregistrerRapports(rs), ...anciennes.map(supprimerBlob)]);
   };
+  /** Supprime une tournée clôturée du téléphone (PDF, .zip et images restantes). */
+  const supprimerRealisation = async (r: Rapport) => {
+    const rs = rapports.filter((x) => x.id !== r.id);
+    const liste = photos.filter((p) => p.tourneeId !== r.id);
+    setRapports(rs); setPhotos(liste);
+    await Promise.all([
+      enregistrerRapports(rs), enregistrerPhotos(liste),
+      ...[r.pdfUri, r.zipCle].filter(Boolean).map((c) => supprimerBlob(c!)),
+      ...photos.filter((p) => p.tourneeId === r.id).map((p) => supprimerBlob(p.id)),
+    ]);
+  };
   const photographier = (etape: EtapePlan | null) => setEcran({ nom: 'capture', etape, cle: Date.now() });
 
   if (ecran.nom === 'capture') {
@@ -60,7 +72,8 @@ export default function App() {
   }
   if (ecran.nom === 'fin') {
     return <FinTournee photosTournee={photosTournee} rapports={rapports} avancementPlan={av} onCloturer={cloturer}
-      onRetour={() => { setEcran({ nom: 'accueil' }); setOnglet('plan'); }} />;
+      onRetour={() => { setEcran({ nom: 'accueil' }); setOnglet('plan'); }}
+      onRealisations={() => { setEcran({ nom: 'accueil' }); setOnglet('realisations'); }} />;
   }
 
   return (
@@ -70,13 +83,16 @@ export default function App() {
         <div className="nom-appli">PhotoTracker</div>
         <nav className="onglets">
           <button className={onglet === 'plan' ? 'actif' : ''} onClick={() => setOnglet('plan')}>
-            Plan{av ? ` · ${av.pct} %` : ''}
+            Plan<small>{av ? `${av.pct} %` : '\u00a0'}</small>
           </button>
           <button className={onglet === 'tournee' ? 'actif' : ''} onClick={() => setOnglet('tournee')}>
-            Tournée du jour
+            Tournée<small>du jour</small>
           </button>
           <button className={onglet === 'photos' ? 'actif' : ''} onClick={() => setOnglet('photos')}>
-            Photos ({photosTournee.length})
+            Photos<small>{photosTournee.length}</small>
+          </button>
+          <button className={onglet === 'realisations' ? 'actif' : ''} onClick={() => setOnglet('realisations')}>
+            Réalisations<small>{rapports.length || '\u00a0'}</small>
           </button>
         </nav>
       </header>
@@ -86,6 +102,8 @@ export default function App() {
             onPhotographier={photographier} onAllerAuPlan={() => setOnglet('plan')} />
         : onglet === 'plan'
         ? <Plan plan={plan} photos={photos} onImporter={(p) => { setPlan(p); enregistrerPlan(p); }} onPhotographier={photographier} />
+        : onglet === 'realisations'
+        ? <Realisations rapports={rapports} onSupprimer={supprimerRealisation} />
         : <Photos photos={photosTournee} onSupprimer={supprimer} />}
       <footer className="barre-bas">
         <button className="btn plein" onClick={() => photographier(null)}>📷 Photo hors plan</button>

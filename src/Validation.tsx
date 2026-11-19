@@ -4,18 +4,20 @@ import { construireReleve } from './releve';
 import { partagerFichier } from './partage';
 import { dateFR, distanceTexte, gpsTexte } from './format';
 import {
-  chargerTournees, enregistrerTournees, importerZip, lireImage, statutFinal, supprimerTournee, totaux,
+  archiverPdf, chargerTournees, enregistrerTournees, importerZip, lireImage, statutFinal, supprimerTournee, totaux,
   type Decision, type TourneeImportee,
 } from './validationDb';
 import { TARIF_PHOTO_EUR, type PhotoRecord } from './types';
 import { get, set } from 'idb-keyval';
 import RapportClient from './RapportClient';
+import DocumentsPdf from './DocumentsPdf';
 
 /** Espace « Validation responsable » : ouvert avec l'adresse de l'appli suivie de #validation. */
 export default function Validation() {
   const [tournees, setTournees] = useState<TourneeImportee[]>([]);
   const [ouverte, setOuverte] = useState<string | null>(null);
   const [rapportClient, setRapportClient] = useState(false);
+  const [documents, setDocuments] = useState(false);
   const [message, setMessage] = useState<{ txt: string; cls: string } | null>(null);
   const [import_, setImport] = useState(false);
   const fichier = useRef<HTMLInputElement>(null);
@@ -40,6 +42,7 @@ export default function Validation() {
     }
   };
 
+  if (documents) return <DocumentsPdf onRetour={() => setDocuments(false)} />;
   if (rapportClient) return <RapportClient tournees={tournees} onRetour={() => setRapportClient(false)} />;
   const t = tournees.find((x) => x.cle === ouverte);
   if (t) {
@@ -70,6 +73,7 @@ export default function Validation() {
         </div>
         {message && <div className={`alerte ${message.cls}`}>{message.txt}</div>}
 
+        <button className="btn contour" onClick={() => setDocuments(true)}>📄 Documents PDF (tout télécharger)</button>
         <div className="carte">
           <h2>Rapport donneur d'ordre</h2>
           <p className="aide">Compare le plan de route transmis avec les tournées reçues, puis prépare le rapport final
@@ -127,7 +131,9 @@ function DetailTournee({ t, onChange, onRetour }: { t: TourneeImportee; onChange
     if (!responsable.trim()) return alert('Indiquez votre nom (visa du responsable).');
     if (tt.enAttente && !confirm(`${tt.enAttente} photo(s) sont encore en attente : elles seront indiquées « En attente » et non payées. Continuer ?`)) return;
     await set('statera-responsable', responsable.trim());
-    setReleve(construireReleve(t, responsable.trim(), await chargerLogoPdf()));
+    const f = construireReleve(t, responsable.trim(), await chargerLogoPdf());
+    await archiverPdf('releve', f, `${t.intervenant} – tournée envoyée le ${dateFR(t.creeLe).slice(0, 10)}`);
+    setReleve(f);
   };
 
   return (

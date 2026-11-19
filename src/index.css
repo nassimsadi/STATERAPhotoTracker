@@ -228,3 +228,17 @@ h1, h2, h3, h4 { margin: 0; }
 .pastille-statut.realise { background: #3BB273; }
 .pastille-statut.en_attente { background: #C08400; }
 .pastille-statut.a_reprendre, .pastille-statut.non_realise { background: var(--rouge); }
+
+/* Onglets sur deux lignes + Réalisations */
+.onglets button { display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 13.5px; padding: 10px 2px; }
+.onglets button small { font-size: 11.5px; font-weight: 600; opacity: .8; }
+.btn.texte { background: none; color: var(--gris); }
+.realisation { gap: 6px; margin-bottom: 10px; }
+.realisation-haut { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 16px; }
+.realisation-haut b::first-letter { text-transform: uppercase; }
+.realisation-chiffres { display: flex; gap: 14px; flex-wrap: wrap; font-size: 15px; color: var(--gris); }
+.realisation-chiffres b { color: var(--sarcelle); font-size: 17px; }
+
+.segment-wrap { flex-wrap: wrap; }
+.segment-wrap button { flex: 1 1 45%; font-size: 14px; padding: 8px 4px; }
+.mini.gris { background: #E3E9E7; color: var(--gris); }

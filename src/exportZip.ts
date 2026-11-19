@@ -10,8 +10,9 @@ const csv = (v: string | number | null | undefined) => `"${String(v ?? '').repla
  *   <Departement>/<Ville>/<AAAAMMJJ_hhmmss>_<Ville>.jpg
  *   recapitulatif.csv (ouvrable dans Excel)
  */
-export async function creerZip(photos: PhotoRecord[], titre: string, intervenant = ''): Promise<File> {
+export async function creerZip(photos: PhotoRecord[], titre: string, intervenant = '', rapportPdf?: File): Promise<File> {
   const zip = new JSZip();
+  if (rapportPdf) zip.file(rapportPdf.name, rapportPdf);   // rapport de fin de tournée de l'intervenant
   const lignes = [[
     'Département', 'Ville', 'Code postal', 'Adresse', 'Date', 'Latitude smartphone', 'Longitude smartphone', 'Précision (m)',
     'Latitude adresse', 'Longitude adresse', 'Écart (m)', 'Adresse validée', 'Motif de vérification', 'Note', 'Fichier', 'Google Maps',
