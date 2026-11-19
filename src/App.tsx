@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Capture from './Capture';
 import Plan from './Plan';
+import TourneeJour from './TourneeJour';
 import Photos from './Photos';
 import FinTournee from './FinTournee';
 import Installation from './Installation';
@@ -14,7 +15,7 @@ type Ecran = { nom: 'accueil' } | { nom: 'capture'; etape: EtapePlan | null; cle
 
 export default function App() {
   const [ecran, setEcran] = useState<Ecran>({ nom: 'accueil' });
-  const [onglet, setOnglet] = useState<'plan' | 'photos'>('plan');
+  const [onglet, setOnglet] = useState<'plan' | 'tournee' | 'photos'>('plan');
   const [photos, setPhotos] = useState<PhotoRecord[]>([]);
   const [plan, setPlan] = useState<EtapePlan[]>([]);
   const [rapports, setRapports] = useState<Rapport[]>([]);
@@ -69,7 +70,10 @@ export default function App() {
         <div className="nom-appli">PhotoTracker</div>
         <nav className="onglets">
           <button className={onglet === 'plan' ? 'actif' : ''} onClick={() => setOnglet('plan')}>
-            Plan de route{av ? ` · ${av.pct} %` : ''}
+            Plan{av ? ` · ${av.pct} %` : ''}
+          </button>
+          <button className={onglet === 'tournee' ? 'actif' : ''} onClick={() => setOnglet('tournee')}>
+            Tournée du jour
           </button>
           <button className={onglet === 'photos' ? 'actif' : ''} onClick={() => setOnglet('photos')}>
             Photos ({photosTournee.length})
@@ -77,7 +81,10 @@ export default function App() {
         </nav>
       </header>
       <Installation />
-      {!charge ? <main className="contenu"><p className="aide centre">Chargement…</p></main> : onglet === 'plan'
+      {!charge ? <main className="contenu"><p className="aide centre">Chargement…</p></main> : onglet === 'tournee'
+        ? <TourneeJour plan={plan} photos={photos} onMajPlan={(p) => { setPlan(p); enregistrerPlan(p); }}
+            onPhotographier={photographier} onAllerAuPlan={() => setOnglet('plan')} />
+        : onglet === 'plan'
         ? <Plan plan={plan} photos={photos} onImporter={(p) => { setPlan(p); enregistrerPlan(p); }} onPhotographier={photographier} />
         : <Photos photos={photosTournee} onSupprimer={supprimer} />}
       <footer className="barre-bas">

@@ -30,7 +30,7 @@ h1, h2, h3, h4 { margin: 0; }
 .entete { background: var(--carte); border-bottom: 1px solid var(--bord); padding-top: calc(12px + env(safe-area-inset-top)); position: sticky; top: 0; z-index: 5; }
 .logo { display: block; width: 170px; margin: 0 auto 8px; }
 .onglets { display: flex; max-width: 640px; margin: 0 auto; }
-.onglets button { flex: 1; background: none; border: 0; border-bottom: 3px solid transparent; padding: 12px 4px; font-size: 15px; font-weight: 700; color: var(--gris); }
+.onglets button { flex: 1; background: none; border: 0; border-bottom: 3px solid transparent; padding: 12px 2px; font-size: 14px; font-weight: 700; color: var(--gris); line-height: 1.2; }
 .onglets button.actif { color: var(--sarcelle); border-bottom-color: var(--sarcelle); }
 
 /* Barre d'écran secondaire */
@@ -186,3 +186,37 @@ h1, h2, h3, h4 { margin: 0; }
 .kpis .kpi b { font-size: 28px; }
 
 .nom-appli { text-align: center; font-weight: 800; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--sarcelle); margin: -4px 0 4px; }
+
+.btn.inverser { flex: 0 0 auto; padding: 0 14px; }
+
+/* Carte */
+.carte-bloc { display: flex; flex-direction: column; gap: 8px; }
+.carte-leaflet { height: 52dvh; min-height: 320px; border-radius: 16px; border: 1px solid var(--bord); overflow: hidden; z-index: 0; }
+.carte-outils { display: flex; gap: 8px; }
+.repere { width: 32px; height: 32px; border-radius: 50%; background: var(--sarcelle); color: #fff; font-weight: 800; font-size: 14px;
+  display: flex; align-items: center; justify-content: center; border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+.repere.fait { background: #3BB273; }
+.bulle { font: 14px/1.4 system-ui, -apple-system, Roboto, sans-serif; min-width: 180px; }
+.bulle .ref { color: var(--sarcelle); font-weight: 800; font-size: 12px; }
+.bulle .consigne { color: var(--orange); font-weight: 600; margin-top: 4px; }
+.bulle .fait { color: var(--vert); font-weight: 700; margin-top: 4px; }
+.bulle-actions { display: flex; gap: 8px; margin-top: 10px; }
+.bulle-actions a, .bulle-actions button { flex: 1; text-align: center; border-radius: 10px; padding: 9px 6px; font-weight: 700; font-size: 14px; text-decoration: none; }
+.bulle-actions a { border: 2px solid var(--sarcelle); color: var(--sarcelle) !important; }
+.bulle-actions button { border: 0; background: var(--sarcelle); color: #fff; }
+
+/* Tournée du jour */
+.rond:disabled { opacity: .35; }
+.prochaine { border: 2px solid var(--sarcelle); }
+.etiquette { font-size: 12px; font-weight: 800; color: #fff; background: var(--sarcelle); align-self: flex-start; padding: 3px 8px; border-radius: 6px; }
+.liste-jour { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.liste-jour li { display: flex; align-items: center; gap: 10px; background: var(--carte); border: 1px solid var(--bord); border-radius: 12px; padding: 8px 10px; }
+.liste-jour li.fait { background: #F4FBF7; border-color: #9FD9B8; }
+.liste-jour li.courante { border: 2px solid var(--sarcelle); }
+.liste-texte { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.liste-texte b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.liste-texte small { color: var(--gris); font-size: 13px; }
+
+.avancement-compact { display: flex; align-items: center; gap: 10px; margin-top: -4px; }
+.avancement-compact .barre-fond { flex: 1; margin: 0; }
+.avancement-compact .pct { font-size: 13px; font-weight: 700; color: var(--sarcelle); white-space: nowrap; }

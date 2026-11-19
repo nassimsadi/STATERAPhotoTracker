@@ -2,9 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { ajouterJours, jourISO, libelleJour, lundi } from './plan';
 import { importerFichierPlan } from './importPlan';
 import { avancement } from './regroupement';
-import { dureeTexte, lienNavigation, localiserEtapes, optimiser, optimiserParJour } from './itineraire';
-import { positionUnique } from './geo';
-import { distanceTexte } from './format';
+import { localiserEtapes, optimiserParJour } from './itineraire';
 import type { EtapePlan, PhotoRecord } from './types';
 
 type Props = {
@@ -65,44 +63,11 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
     }
   };
 
-  /** Itinéraire optimal depuis la position de l'intervenant, pour les étapes restantes du jour affiché. */
-  const itineraireOptimal = async () => {
-    const restantes = duJour.filter((e) => !nbParEtape.get(e.id));
-    const faites = duJour.filter((e) => nbParEtape.get(e.id)).sort((a, b) => a.ordre - b.ordre);
-    if (!restantes.length) return setInfo({ txt: 'Toutes les étapes de ce jour ont déjà été photographiées.', cls: 'vert' });
-    try {
-      setCalcul('Recherche de votre position…');
-      const pos = await positionUnique().catch(() => null);
-      setCalcul('Calcul de l\'itinéraire optimal par la route…');
-      const localisees = await localiserEtapes(restantes);
-      const { ordre, distanceM, dureeS, source } = await optimiser(localisees, pos ?? undefined);
-      const nouveauxOrdres = new Map<string, EtapePlan>();
-      [...faites, ...ordre].forEach((e, i) => nouveauxOrdres.set(e.id, { ...e, ordre: i + 1, ordreAuto: true }));
-      onImporter(plan.map((e) => nouveauxOrdres.get(e.id) ?? e));
-      const nonLoc = ordre.filter((e) => e.latitude == null).length;
-      setInfo({
-        txt: `Itinéraire optimisé${pos ? ' depuis votre position' : ''} : ${ordre.length} étape(s) restante(s), `
-          + (source === 'vol d\'oiseau'
-            ? `environ ${distanceTexte(distanceM)} (estimation : service d'itinéraire injoignable, vérifiez votre réseau).`
-            : `${distanceTexte(distanceM)} et ${dureeTexte(dureeS)} de route.`)
-          + (pos ? '' : ' (Position GPS indisponible : départ depuis la première étape.)')
-          + (nonLoc ? ` ${nonLoc} adresse(s) introuvable(s) placée(s) à la fin.` : ''),
-        cls: 'vert',
-      });
-    } catch (e) {
-      setInfo({ txt: `Calcul impossible : ${e instanceof Error ? e.message : String(e)}`, cls: 'rouge' });
-    } finally {
-      setCalcul(null);
-    }
-  };
-
   const debutSemaine = lundi(jour);
   const finSemaine = ajouterJours(debutSemaine, 6);
   // Les étapes sans date sont affichées dans toutes les vues.
   const duJour = plan.filter((e) => e.date === jour || !e.date);
   const deLaSemaine = plan.filter((e) => (e.date >= debutSemaine && e.date <= finSemaine) || !e.date);
-  // Étapes du jour non encore photographiées, dans l'ordre de passage (pour la navigation)
-  const restantesDuJour = duJour.filter((e) => !nbParEtape.get(e.id)).sort((a, b) => a.ordre - b.ordre);
   const datees = [...new Set(plan.map((e) => e.date).filter(Boolean))].sort();
   const suivante = datees.find((d) => d > (vue === 'semaine' ? finSemaine : jour));
   const precedente = [...datees].reverse().find((d) => d < (vue === 'semaine' ? debutSemaine : jour));
@@ -135,7 +100,6 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
           {info && <div className={`alerte ${info.cls}`}>{info.txt}</div>}
           {calcul && <div className="alerte gris">{calcul}</div>}
           <button className="btn plein" onClick={() => fichier.current?.click()}>Importer le plan de route (Excel)</button>
-          <a className="btn contour" href={`${import.meta.env.BASE_URL}plan-de-route-modele.xlsx`} download>Télécharger le modèle Excel</a>
         </div>
       </main>
     );
@@ -172,18 +136,8 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
         </div>
       )}
 
-      {vue === 'jour' && duJour.length > 1 && (
-        <div className="actions">
-          <button className="btn plein petit" disabled={!!calcul} onClick={itineraireOptimal}>🧭 Itinéraire optimal depuis ma position</button>
-        </div>
-      )}
       {calcul && <div className="alerte gris">{calcul}</div>}
       {info && <div className={`alerte ${info.cls}`}>{info.txt}</div>}
-      {vue === 'jour' && restantesDuJour.length > 0 && (
-        <a className="btn contour" href={lienNavigation(restantesDuJour.slice(0, 10))} target="_blank" rel="noreferrer">
-          ▶ Navigation : {restantesDuJour.length > 10 ? `10 prochaines étapes (sur ${restantesDuJour.length} restantes)` : `${restantesDuJour.length} étape(s) restante(s)`}
-        </a>
-      )}
       {visibles.length === 0 && (
         <div className="carte">
           <p className="aide centre">Aucune étape prévue {vue === 'semaine' ? 'cette semaine' : 'ce jour'}.</p>
@@ -246,7 +200,7 @@ function Barre({ libelle, st, fort }: { libelle: string; st: { total: number; fa
   );
 }
 
-function lienItineraire(e: EtapePlan) {
+export function lienItineraire(e: EtapePlan) {
   const dest = e.latitude != null && e.longitude != null
     ? `${e.latitude},${e.longitude}`
     : encodeURIComponent([e.adresse, e.codePostal, e.ville].filter(Boolean).join(' '));
@@ -256,7 +210,7 @@ function lienItineraire(e: EtapePlan) {
 }
 
 /** Aujourd'hui s'il a des étapes, sinon la prochaine journée planifiée, sinon la dernière. */
-function jourParDefaut(plan: EtapePlan[], aujourdhui: string): string {
+export function jourParDefaut(plan: EtapePlan[], aujourdhui: string): string {
   const dates = plan.map((e) => e.date).filter(Boolean).sort();
   if (dates.includes(aujourdhui)) return aujourdhui;
   return dates.find((d) => d > aujourdhui) ?? dates[dates.length - 1] ?? aujourdhui;

@@ -67,6 +67,12 @@ export default function Validation() {
         </div>
         {message && <div className={`alerte ${message.cls}`}>{message.txt}</div>}
 
+        <div className="carte">
+          <h2>Préparer un plan de route</h2>
+          <p className="aide">Modèle Excel à remplir puis à envoyer à l'intervenant. Colonnes obligatoires : Adresse, Code postal, Ville.
+            Date, Site et Consigne sont conseillées ; sans colonne Ordre, l'appli calcule l'itinéraire optimal.</p>
+          <a className="btn contour" href={`${import.meta.env.BASE_URL}plan-de-route-modele.xlsx`} download>Télécharger le modèle Excel</a>
+        </div>
         <a className="btn contour" href="./" onClick={() => { location.hash = ''; }}>Ouvrir l'appli intervenant (plan de route, photos)</a>
 
         {tournees.map((x) => {

@@ -292,3 +292,26 @@ export function lienNavigation(etapes: EtapePlan[]): string {
   return `https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=${encodeURIComponent(p(dest))}`
     + (via ? `&waypoints=${encodeURIComponent(via)}` : '');
 }
+
+/** Tracé routier (liste de [lat, lon]) passant par les points dans l'ordre. OSRM, par tronçons de 25 points. */
+const cacheTrace = new Map<string, [number, number][] | null>();
+export async function traceRoutier(pts: Point[]): Promise<[number, number][] | null> {
+  const cle = pts.map((p) => `${p.latitude.toFixed(5)},${p.longitude.toFixed(5)}`).join(';');
+  if (cacheTrace.has(cle)) return cacheTrace.get(cle)!;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return null;
+  const res: [number, number][] = [];
+  try {
+    for (let i = 0; i < pts.length - 1; i += 24) {
+      const tron = pts.slice(i, i + 25);
+      const coords = tron.map((p) => `${p.longitude.toFixed(6)},${p.latitude.toFixed(6)}`).join(';');
+      const j = await lireJson(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
+      if (j.code !== 'Ok') throw new Error('OSRM');
+      (j.routes[0].geometry.coordinates as [number, number][]).forEach(([lon, lat]) => res.push([lat, lon]));
+      if (pts.length > 25) await pause(300);
+    }
+    cacheTrace.set(cle, res);
+    return res;
+  } catch {
+    return null;
+  }
+}

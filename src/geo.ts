@@ -11,10 +11,13 @@ const versPosition = (p: GeolocationPosition): Position => ({
   latitude: p.coords.latitude, longitude: p.coords.longitude, precision: p.coords.accuracy, horodatage: p.timestamp,
 });
 
+/** Dernière position connue (partagée entre la carte, la prise de photo et le calcul d'itinéraire). */
+let derniere: Position | null = null;
+
 export function suivrePosition(ok: (p: Position) => void, erreur: (msg: string) => void): () => void {
   if (!('geolocation' in navigator)) { erreur("Ce téléphone ne fournit pas de position GPS."); return () => {}; }
   const id = navigator.geolocation.watchPosition(
-    (p) => ok(versPosition(p)),
+    (p) => { derniere = versPosition(p); ok(derniere); },
     (e) => erreur(e.code === e.PERMISSION_DENIED
       ? 'Localisation refusée : autorisez-la dans les réglages du téléphone.'
       : 'Recherche GPS… placez-vous à l\'extérieur.'),
@@ -23,9 +26,12 @@ export function suivrePosition(ok: (p: Position) => void, erreur: (msg: string) 
   return () => navigator.geolocation.clearWatch(id);
 }
 
-export const positionUnique = () => new Promise<Position>((res, rej) =>
-  navigator.geolocation.getCurrentPosition((p) => res(versPosition(p)), (e) => rej(new Error(e.message)),
-    { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }));
+/** Position actuelle : réutilise la dernière position connue si elle a moins de 30 s. */
+export const positionUnique = () => new Promise<Position>((res, rej) => {
+  if (derniere && Date.now() - derniere.horodatage < 30000) return res(derniere);
+  navigator.geolocation.getCurrentPosition((p) => { derniere = versPosition(p); res(derniere); }, (e) => rej(new Error(e.message)),
+    { enableHighAccuracy: true, maximumAge: 30000, timeout: 20000 });
+});
 
 // ---------- Géocodage ----------
 const SERVEURS = ['https://data.geopf.fr/geocodage', 'https://api-adresse.data.gouv.fr'];
