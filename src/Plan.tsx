@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { ajouterJours, jourISO, libelleJour, lundi } from './plan';
 import { importerFichierPlan } from './importPlan';
 import { avancement } from './regroupement';
-import { lienNavigation, localiserEtapes, optimiser, optimiserParJour } from './itineraire';
+import { dureeTexte, lienNavigation, localiserEtapes, optimiser, optimiserParJour } from './itineraire';
 import { positionUnique } from './geo';
 import { distanceTexte } from './format';
 import type { EtapePlan, PhotoRecord } from './types';
@@ -23,7 +23,6 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
   const [info, setInfo] = useState<{ txt: string; cls: string } | null>(null);
   const fichier = useRef<HTMLInputElement>(null);
   const [calcul, setCalcul] = useState<string | null>(null);
-  const [navigation, setNavigation] = useState<{ lien: string; nb: number } | null>(null);
 
   const nbParEtape = useMemo(() => {
     const m = new Map<string, number>();
@@ -46,17 +45,17 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
         + (dates.length ? (dates[0] === dates[dates.length - 1] ? `, le ${libelleJour(dates[0])}` : `, du ${libelleJour(dates[0])} au ${libelleJour(dates[dates.length - 1])}`) : '')
         + (sansDate ? ` · ${sansDate} sans date (affichées chaque jour)` : '');
       setInfo({ txt: resume, cls: 'vert' });
-      setNavigation(null);
       // Localisation des adresses, puis ordre de passage optimal pour chaque journée sans « Ordre » fourni.
       setCalcul('Localisation des adresses…');
       const localisees = await localiserEtapes(etapes, (f, t) => setCalcul(`Localisation des adresses : ${f}/${t}…`));
-      const optimise = optimiserParJour(localisees);
+      setCalcul('Calcul des itinéraires par la route…');
+      const { plan: optimise, source } = await optimiserParJour(localisees);
       onImporter(optimise);
       setCalcul(null);
       const nonLoc = optimise.filter((e) => e.nonLocalisee).length;
       const auto = optimise.some((e) => e.ordreAuto);
       setInfo({
-        txt: resume + (auto ? ' · ordre de passage optimisé' : '')
+        txt: resume + (auto ? (source === 'vol d\'oiseau' ? ' · ordre approximatif (calcul routier indisponible, relancez 🧭 avec du réseau)' : ' · ordre de passage optimisé par la route') : '')
           + (nonLoc ? ` · ${nonLoc} adresse(s) introuvable(s), à vérifier` : ''),
         cls: nonLoc ? 'orange' : 'vert',
       });
@@ -74,16 +73,18 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
     try {
       setCalcul('Recherche de votre position…');
       const pos = await positionUnique().catch(() => null);
-      setCalcul('Calcul de l\'itinéraire optimal…');
+      setCalcul('Calcul de l\'itinéraire optimal par la route…');
       const localisees = await localiserEtapes(restantes);
-      const { ordre, distanceM } = optimiser(localisees, pos ?? undefined);
+      const { ordre, distanceM, dureeS, source } = await optimiser(localisees, pos ?? undefined);
       const nouveauxOrdres = new Map<string, EtapePlan>();
       [...faites, ...ordre].forEach((e, i) => nouveauxOrdres.set(e.id, { ...e, ordre: i + 1, ordreAuto: true }));
       onImporter(plan.map((e) => nouveauxOrdres.get(e.id) ?? e));
-      setNavigation({ lien: lienNavigation(ordre), nb: ordre.length });
       const nonLoc = ordre.filter((e) => e.latitude == null).length;
       setInfo({
-        txt: `Itinéraire optimisé${pos ? ' depuis votre position' : ''} : ${ordre.length} étape(s) restante(s), environ ${distanceTexte(distanceM)} à vol d'oiseau.`
+        txt: `Itinéraire optimisé${pos ? ' depuis votre position' : ''} : ${ordre.length} étape(s) restante(s), `
+          + (source === 'vol d\'oiseau'
+            ? `environ ${distanceTexte(distanceM)} (estimation : service d'itinéraire injoignable, vérifiez votre réseau).`
+            : `${distanceTexte(distanceM)} et ${dureeTexte(dureeS)} de route.`)
           + (pos ? '' : ' (Position GPS indisponible : départ depuis la première étape.)')
           + (nonLoc ? ` ${nonLoc} adresse(s) introuvable(s) placée(s) à la fin.` : ''),
         cls: 'vert',
@@ -100,6 +101,8 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
   // Les étapes sans date sont affichées dans toutes les vues.
   const duJour = plan.filter((e) => e.date === jour || !e.date);
   const deLaSemaine = plan.filter((e) => (e.date >= debutSemaine && e.date <= finSemaine) || !e.date);
+  // Étapes du jour non encore photographiées, dans l'ordre de passage (pour la navigation)
+  const restantesDuJour = duJour.filter((e) => !nbParEtape.get(e.id)).sort((a, b) => a.ordre - b.ordre);
   const datees = [...new Set(plan.map((e) => e.date).filter(Boolean))].sort();
   const suivante = datees.find((d) => d > (vue === 'semaine' ? finSemaine : jour));
   const precedente = [...datees].reverse().find((d) => d < (vue === 'semaine' ? debutSemaine : jour));
@@ -176,9 +179,9 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
       )}
       {calcul && <div className="alerte gris">{calcul}</div>}
       {info && <div className={`alerte ${info.cls}`}>{info.txt}</div>}
-      {navigation && vue === 'jour' && (
-        <a className="btn contour" href={navigation.lien} target="_blank" rel="noreferrer">
-          ▶ Lancer la navigation (Google Maps){navigation.nb > 10 ? ' – 10 premières étapes' : ''}
+      {vue === 'jour' && restantesDuJour.length > 0 && (
+        <a className="btn contour" href={lienNavigation(restantesDuJour.slice(0, 10))} target="_blank" rel="noreferrer">
+          ▶ Navigation : {restantesDuJour.length > 10 ? `10 prochaines étapes (sur ${restantesDuJour.length} restantes)` : `${restantesDuJour.length} étape(s) restante(s)`}
         </a>
       )}
       {visibles.length === 0 && (
