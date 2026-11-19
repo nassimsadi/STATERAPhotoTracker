@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { chargerImage, dessiner, versJpeg, type InfosCartouche } from './cartouche';
+import { chargerImage, dessiner, versJpeg, versJpegBrut, type InfosCartouche } from './cartouche';
 import { adresseDepuisGPS, coordsDepuisAdresse, suivrePosition, tolerance, type CoordsSite, type Position } from './geo';
 import { codeDepartementDepuisCP, libelleDepartement } from './departements';
 import { dateFR, distanceM, distanceTexte, gpsTexte } from './format';
@@ -136,6 +136,7 @@ export default function Capture({ etape, onEnregistree, onFermer }: Props) {
       const blob = await versJpeg(canvas.current!);
       const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       await ecrireBlob(id, blob);
+      await ecrireBlob(`${id}:brute`, await versJpegBrut(image!));   // version sans cartouche
       onEnregistree({
         id, fichier: `${id}.jpg`, dateISO, latitude: pos!.latitude, longitude: pos!.longitude, precision: pos!.precision,
         latitudeSite: site.etat === 'ok' ? site.latitude : null, longitudeSite: site.etat === 'ok' ? site.longitude : null,

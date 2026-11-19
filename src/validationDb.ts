@@ -20,7 +20,8 @@ export type TourneeImportee = {
 export const chargerTournees = async () => (await get<TourneeImportee[]>('tournees', meta)) ?? [];
 export const enregistrerTournees = (t: TourneeImportee[]) => set('tournees', t, meta);
 export const lireImage = (cle: string, id: string) => get<Blob>(`${cle}/${id}`, images);
-export const supprimerTournee = async (t: TourneeImportee) => Promise.all(t.photos.map((p) => del(`${t.cle}/${p.id}`, images)));
+export const supprimerTournee = async (t: TourneeImportee) => Promise.all(t.photos.flatMap((p) => [del(`${t.cle}/${p.id}`, images), del(`${t.cle}/${p.id}:brute`, images)]));
+export const lireImageBrute = (cle: string, id: string) => get<Blob>(`${cle}/${id}:brute`, images);
 
 /** Importe le .zip envoyé par un intervenant. */
 export async function importerZip(f: File): Promise<TourneeImportee> {
@@ -28,11 +29,13 @@ export async function importerZip(f: File): Promise<TourneeImportee> {
   try { zip = await JSZip.loadAsync(f); } catch { throw new Error("Ce fichier n'est pas un .zip valide."); }
   const json = zip.file('donnees-validation.json');
   if (!json) throw new Error("Ce .zip ne vient pas de l'appli STATERA PhotoTracker (fichier donnees-validation.json absent).");
-  const d = JSON.parse(await json.async('string')) as { intervenant: string; creeLe: string; photos: (PhotoRecord & { cheminZip: string })[] };
+  const d = JSON.parse(await json.async('string')) as { intervenant: string; creeLe: string; photos: (PhotoRecord & { cheminZip: string; cheminZipBrut?: string })[] };
   const cle = `${d.intervenant}|${d.creeLe}`;
   for (const p of d.photos) {
     const img = zip.file(p.cheminZip);
     if (img) await set(`${cle}/${p.id}`, new Blob([await img.async('arraybuffer')], { type: 'image/jpeg' }), images);
+    const brute = p.cheminZipBrut ? zip.file(p.cheminZipBrut) : null;
+    if (brute) await set(`${cle}/${p.id}:brute`, new Blob([await brute.async('arraybuffer')], { type: 'image/jpeg' }), images);
   }
   for (const pdf of zip.file(/^[^/]+\.pdf$/)) {
     const b = await pdf.async('arraybuffer');

@@ -1,4 +1,4 @@
-// Composition de la photo finale : image redimensionnée + logo + cartouche d'informations.
+// Composition de la photo finale : image redimensionnée + cartouche d'informations (sans logo).
 // Sortie : JPEG, 1600 px sur le grand côté, qualité 0,6 (≈ 200 à 400 Ko).
 
 export const GRAND_COTE = 1600;
@@ -13,17 +13,6 @@ export type InfosCartouche = {
   date: string;
   note: string;
 };
-
-let logoCache: Promise<HTMLImageElement> | null = null;
-function logo() {
-  logoCache ??= new Promise((res, rej) => {
-    const i = new Image();
-    i.onload = () => res(i);
-    i.onerror = rej;
-    i.src = `${import.meta.env.BASE_URL}logo-statera.png`;
-  });
-  return logoCache;
-}
 
 /** Charge la photo en respectant l'orientation EXIF (photo prise en portrait). */
 export async function chargerImage(fichier: Blob): Promise<ImageBitmap> {
@@ -110,17 +99,18 @@ export async function dessiner(canvas: HTMLCanvasElement, img: ImageBitmap, info
     ctx.fillText(t, marge, y);
     y += l.taille * u * interligne;
   }
+}
 
-  // Logo sur pastille blanche en haut à gauche
-  try {
-    const lg = await logo();
-    const lw = 24 * u, lh = (lw * lg.height) / lg.width, p = 1.4 * u;
-    ctx.fillStyle = 'rgba(255,255,255,0.92)';
-    const x = 2 * u, yy = 2 * u, r = 1.2 * u;
-    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x, yy, lw + 2 * p, lh + 2 * p, r); ctx.fill(); }
-    else ctx.fillRect(x, yy, lw + 2 * p, lh + 2 * p);
-    ctx.drawImage(lg, x + p, yy + p, lw, lh);
-  } catch { /* logo absent : on continue */ }
+/** Version « brute » : même taille, sans cartouche, et sans métadonnées (le JPEG du canvas n'a pas d'EXIF). */
+export async function versJpegBrut(img: ImageBitmap): Promise<Blob> {
+  const ratio = img.width / img.height;
+  const [W, H] = ratio >= 1 ? [GRAND_COTE, Math.round(GRAND_COTE / ratio)] : [Math.round(GRAND_COTE * ratio), GRAND_COTE];
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const ctx = c.getContext('2d')!;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, W, H);
+  return versJpeg(c);
 }
 
 export const versJpeg = (canvas: HTMLCanvasElement) =>

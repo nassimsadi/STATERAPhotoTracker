@@ -24,7 +24,7 @@ export async function creerZip(photos: PhotoRecord[], titre: string, intervenant
   ];
   const lignes: Valeur[][] = [];
   const noms = new Set<string>();
-  const donnees: (PhotoRecord & { cheminZip: string })[] = [];
+  const donnees: (PhotoRecord & { cheminZip: string; cheminZipBrut?: string })[] = [];
   for (const p of photos) {
     const blob = await lireBlob(p.id);
     if (!blob) continue;
@@ -34,7 +34,10 @@ export async function creerZip(photos: PhotoRecord[], titre: string, intervenant
     for (let i = 2; noms.has(chemin); i++) chemin = `${base}_${i}${suffixe}.jpg`;
     noms.add(chemin);
     zip.file(chemin, blob);
-    donnees.push({ ...p, cheminZip: chemin });
+    const brute = await lireBlob(`${p.id}:brute`);
+    const cheminBrut = brute ? `Sans_cartouche/${chemin}` : undefined;
+    if (brute) zip.file(cheminBrut!, brute);
+    donnees.push({ ...p, cheminZip: chemin, cheminZipBrut: cheminBrut });
     lignes.push([
       p.departement, p.ville, p.codePostal, p.adresse, p.siteRef ?? '', dateExcel(p.datePrevue), dateExcel(p.dateISO), heure(p.dateISO),
       p.latitude, p.longitude, p.precision != null ? Math.round(p.precision) : null, p.latitudeSite, p.longitudeSite, p.ecartM,

@@ -3,7 +3,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import JSZip from 'jszip';
 import { dateFR, gpsTexte, horodatageFichier, nomSur } from './format';
-import { lireImage } from './validationDb';
+import { lireImage, lireImageBrute } from './validationDb';
 import { classeurExcel, dateExcel, heure, type Colonne, type Valeur } from './excel';
 import { LIBELLE_STATUT, type LigneSite, type PhotoRecue, type StatutSite } from './rapprochement';
 
@@ -189,18 +189,22 @@ export async function construireLivrable(r: Resultat, infos: InfosRapport, pdf: 
     { titre: 'Fichiers', largeur: 60 }, { titre: 'Observation', largeur: 40 },
   ];
   const lignes: Valeur[][] = [];
-  let k = 0;
+  let k = 0, sansBrute = 0;
   const total = r.lignes.reduce((t, l) => t + l.validees.length, 0);
   for (const l of r.lignes) {
-    const dossier = `Photos/${nomSur(l.etape.nom || l.etape.adresse)}_${nomSur(l.etape.ville)}`;
+    const site = `${nomSur(l.etape.nom || l.etape.adresse)}_${nomSur(l.etape.ville)}`;
+    const dossier = `Photos_avec_coordonnees/${site}`;
     const fichiers: string[] = [];
     for (const [i, p] of l.validees.entries()) {
       progression?.(`Ajout des photos : ${++k}/${total}…`);
       const b = await lireImage(p.tourneeCle, p.id);
       if (!b) continue;
-      const f = `${dossier}/${horodatageFichier(p.dateISO)}_${i + 1}.jpg`;
+      const nom = `${horodatageFichier(p.dateISO)}_${i + 1}.jpg`;
+      const f = `${dossier}/${nom}`;
       zip.file(f, b);
       fichiers.push(f);
+      const brute = await lireImageBrute(p.tourneeCle, p.id);
+      if (brute) zip.file(`Photos_sans_coordonnees/${site}/${nom}`, brute); else sansBrute++;
     }
     const p0 = l.validees[0];
     lignes.push([l.etape.nom, l.etape.adresse, l.etape.codePostal, l.etape.ville, dateExcel(l.etape.date), LIBELLE_STATUT[l.statut],
@@ -210,10 +214,17 @@ export async function construireLivrable(r: Resultat, infos: InfosRapport, pdf: 
   if (infos.avecHorsPlan) {
     for (const p of r.horsPlan.filter((x) => x.statut === 'validee' || x.statut === 'validee_auto')) {
       const b = await lireImage(p.tourneeCle, p.id);
-      if (b) zip.file(`Photos/_Hors_plan/${horodatageFichier(p.dateISO)}_${nomSur(p.ville)}.jpg`, b);
+      const nom = `${horodatageFichier(p.dateISO)}_${nomSur(p.ville)}.jpg`;
+      if (b) zip.file(`Photos_avec_coordonnees/_Hors_plan/${nom}`, b);
+      const brute = await lireImageBrute(p.tourneeCle, p.id);
+      if (brute) zip.file(`Photos_sans_coordonnees/_Hors_plan/${nom}`, brute);
     }
   }
   zip.file('Recapitulatif_sites.xlsx', await classeurExcel('Sites', colonnes, lignes));
+  if (sansBrute) {
+    zip.file('Photos_sans_coordonnees/LISEZ-MOI.txt', `${sansBrute} photo(s) prise(s) avant la mise à jour de l'application n'existent qu'avec leurs coordonnées : `
+      + 'elles figurent uniquement dans le dossier Photos_avec_coordonnees.\r\n');
+  }
   const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE', mimeType: 'application/zip' });
   return new File([blob], pdf.name.replace(/\.pdf$/, '.zip'), { type: 'application/zip' });
 }

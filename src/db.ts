@@ -16,7 +16,7 @@ export const ecrireIntervenant = (n: string) => set('intervenant', n, meta);
 
 export const lireBlob = (cle: string) => get<Blob>(cle, blobs);
 export const ecrireBlob = (cle: string, b: Blob) => set(cle, b, blobs);
-export const supprimerBlob = (cle: string) => del(cle, blobs);
+export const supprimerBlob = async (cle: string) => { await del(cle, blobs); await del(`${cle}:brute`, blobs); };
 
 /** Demande au navigateur de ne pas effacer les données (important sur iPhone). */
 export async function demanderPersistance() {
