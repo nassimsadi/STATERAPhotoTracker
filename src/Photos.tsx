@@ -6,9 +6,9 @@ import { dateFR, gpsTexte, horodatageFichier } from './format';
 import { grouper } from './regroupement';
 import type { PhotoRecord } from './types';
 
-type Props = { photos: PhotoRecord[]; onSupprimer: (id: string) => void };
+type Props = { photos: PhotoRecord[]; onSupprimer: (id: string) => void; nbCloturees?: number; onRealisations?: () => void };
 
-export default function Photos({ photos, onSupprimer }: Props) {
+export default function Photos({ photos, onSupprimer, nbCloturees = 0, onRealisations }: Props) {
   const groupes = useMemo(() => grouper(photos), [photos]);
   const [fermes, setFermes] = useState<Record<string, boolean>>({});
   const [zipPret, setZipPret] = useState<{ cle: string; f: File; nb: number } | null>(null);
@@ -30,9 +30,16 @@ export default function Photos({ photos, onSupprimer }: Props) {
     return (
       <main className="contenu">
         <div className="carte">
-          <h2>Aucune photo dans la tournée</h2>
-          <p className="aide">Prenez une photo depuis le plan de route ou avec « Photo hors plan ». Les photos sont classées
-            ici par département, puis par ville.</p>
+          <h2>Aucune photo dans la tournée en cours</h2>
+          <p className="aide">Cet onglet montre les photos de la tournée en cours, classées par département puis par ville.
+            Prenez une photo depuis la tournée du jour, le plan de route ou avec « Photo hors plan ».</p>
+          {nbCloturees > 0 && (
+            <>
+              <div className="alerte vert">{nbCloturees} photo(s) appartiennent à des tournées déjà clôturées (« Fin de tournée ») :
+                elles sont dans l'onglet Réalisations, dans le .zip de chaque journée.</div>
+              {onRealisations && <button className="btn contour" onClick={onRealisations}>Voir les Réalisations</button>}
+            </>
+          )}
         </div>
       </main>
     );

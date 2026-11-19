@@ -104,7 +104,7 @@ export default function App() {
         ? <Plan plan={plan} photos={photos} onImporter={(p) => { setPlan(p); enregistrerPlan(p); }} onPhotographier={photographier} />
         : onglet === 'realisations'
         ? <Realisations rapports={rapports} onSupprimer={supprimerRealisation} />
-        : <Photos photos={photosTournee} onSupprimer={supprimer} />}
+        : <Photos photos={photosTournee} onSupprimer={supprimer} nbCloturees={photos.length - photosTournee.length} onRealisations={() => setOnglet('realisations')} />}
       <footer className="barre-bas">
         <button className="btn plein" onClick={() => photographier(null)}>📷 Photo hors plan</button>
         <button className="btn contour" onClick={() => setEcran({ nom: 'fin' })}>🏁 Fin de tournée</button>
