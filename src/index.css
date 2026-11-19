@@ -264,3 +264,6 @@ h1, h2, h3, h4 { margin: 0; }
 .case-tva { background: var(--sarcelle-fond); border-radius: 12px; padding: 10px; }
 .case-tva span { display: flex; flex-direction: column; gap: 2px; }
 .case-tva small { color: var(--gris); font-size: 13px; }
+
+.conseil-cadrage { display: flex; flex-direction: column; gap: 4px; background: var(--sarcelle-fond); border-radius: 12px; padding: 12px 14px; font-size: 14px; line-height: 1.45; }
+.conseil-cadrage b:first-child { color: var(--sarcelle); font-size: 15px; }

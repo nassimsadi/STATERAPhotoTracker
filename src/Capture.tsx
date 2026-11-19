@@ -182,7 +182,14 @@ export default function Capture({ etape, onEnregistree, onFermer }: Props) {
           onChange={(e) => { photoChoisie(e.target.files?.[0]); e.target.value = ''; }} />
 
         {!image ? (
-          <button className="btn plein enorme" onClick={() => entree.current?.click()}>📷  Prendre la photo</button>
+          <>
+            <button className="btn plein enorme" onClick={() => entree.current?.click()}>📷  Prendre la photo</button>
+            <div className="conseil-cadrage">
+              <b>Cadrez tout le site</b>
+              <span>Reculez pour que l'ensemble soit visible (armoire, façade, abords). Si besoin, passez l'appareil photo
+                en grand-angle (<b>0,5×</b>). Plusieurs photos par site sont possibles.</span>
+            </div>
+          </>
         ) : (
           <>
             <canvas ref={canvas} className="apercu" />

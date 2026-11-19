@@ -1,4 +1,4 @@
-// Composition de la photo finale : image redimensionnée + cartouche d'informations (sans logo).
+// Composition de la photo finale : photo entière (ni recadrée ni masquée) + cartouche d'informations en dessous.
 // Sortie : JPEG, 1280 px sur le grand côté, qualité 0,55 (≈ 100 à 250 Ko pour une photo de terrain).
 
 export const GRAND_COTE = 1280;
@@ -56,8 +56,6 @@ export async function dessiner(canvas: HTMLCanvasElement, img: ImageBitmap, info
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, 0, 0, W, H);
 
   const u = Math.min(W, H) / 100; // unité : 1 % du petit côté → lisible en portrait comme en paysage
   const police = (taille: number, gras = 600) => `${gras} ${Math.round(taille * u)}px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
@@ -83,13 +81,18 @@ export async function dessiner(canvas: HTMLCanvasElement, img: ImageBitmap, info
   }
 
   const interligne = 1.32;
-  const hauteurBande = marge * 2 + lignes.reduce((h, l) => h + l.taille * u * interligne, 0);
-  ctx.fillStyle = 'rgba(0,0,0,0.68)';
-  ctx.fillRect(0, H - hauteurBande, W, hauteurBande);
-  ctx.fillStyle = '#2E5E58';
-  ctx.fillRect(0, H - hauteurBande, W, 0.6 * u);
+  const hauteurBande = Math.round(marge * 2 + lignes.reduce((h, l) => h + l.taille * u * interligne, 0));
 
-  let y = H - hauteurBande + marge;
+  // Le cartouche est placé SOUS la photo : l'image du site reste visible en entier, rien n'est masqué ni recadré.
+  canvas.height = H + hauteurBande;          // (redimensionner réinitialise le canvas)
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, W, H);
+  ctx.fillStyle = '#1B1F1E';
+  ctx.fillRect(0, H, W, hauteurBande);
+  ctx.fillStyle = '#2E5E58';
+  ctx.fillRect(0, H, W, 0.6 * u);
+
+  let y = H + marge;
   ctx.textBaseline = 'top';
   for (const l of lignes) {
     ctx.font = police(l.taille, l.gras);
