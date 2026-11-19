@@ -46,9 +46,9 @@ export default function App() {
   };
   const cloturer = async (r: Rapport) => {
     const ids = new Set(photosTournee.map((p) => p.id));
-    // On garde les images de la tournée qui se termine (sécurité si le .zip doit être renvoyé),
-    // et on libère celles des tournées précédentes. Les fiches restent (avancement du plan).
-    const anciennes = photos.filter((p) => p.tourneeId).map((p) => p.id);
+    // Les images des tournées précédentes ne sont libérées que si leur .zip est conservé (onglet Réalisations).
+    const avecZip = new Set(rapports.filter((x) => x.zipCle).map((x) => x.id));
+    const anciennes = photos.filter((p) => p.tourneeId && avecZip.has(p.tourneeId)).map((p) => p.id);
     const liste = photos.map((p) => (ids.has(p.id) ? { ...p, tourneeId: r.id } : p));
     const rs = [...rapports, r];
     setPhotos(liste); setRapports(rs);
@@ -103,7 +103,8 @@ export default function App() {
         : onglet === 'plan'
         ? <Plan plan={plan} photos={photos} onImporter={(p) => { setPlan(p); enregistrerPlan(p); }} onPhotographier={photographier} />
         : onglet === 'realisations'
-        ? <Realisations rapports={rapports} onSupprimer={supprimerRealisation} />
+        ? <Realisations rapports={rapports} photos={photos} onSupprimer={supprimerRealisation}
+            onMajRapport={(r) => { const rs = rapports.map((x) => (x.id === r.id ? r : x)); setRapports(rs); enregistrerRapports(rs); }} />
         : <Photos photos={photosTournee} onSupprimer={supprimer} nbCloturees={photos.length - photosTournee.length} onRealisations={() => setOnglet('realisations')} />}
       <footer className="barre-bas">
         <button className="btn plein" onClick={() => photographier(null)}>📷 Photo hors plan</button>

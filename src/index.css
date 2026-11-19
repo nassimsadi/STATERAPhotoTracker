@@ -242,3 +242,6 @@ h1, h2, h3, h4 { margin: 0; }
 .segment-wrap { flex-wrap: wrap; }
 .segment-wrap button { flex: 1 1 45%; font-size: 14px; padding: 8px 4px; }
 .mini.gris { background: #E3E9E7; color: var(--gris); }
+
+.petit-supprimer { min-height: 40px; font-size: 14px; }
+.avertissement { font-size: 12.5px; margin-top: -4px; }

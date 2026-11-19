@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { lireBlob } from './db';
+import { ecrireBlob, lireBlob } from './db';
+import { creerZip } from './exportZip';
 import { euros } from './rapport';
 import { dateFR } from './format';
 import { libelleJour } from './plan';
-import type { Rapport } from './types';
+import type { PhotoRecord, Rapport } from './types';
 
-type Props = { rapports: Rapport[]; onSupprimer: (r: Rapport) => void };
+type Props = { rapports: Rapport[]; photos: PhotoRecord[]; onSupprimer: (r: Rapport) => void; onMajRapport: (r: Rapport) => void };
 
 /** Télécharge un fichier sur l'appareil (Téléchargements / Fichiers). */
 function telecharger(b: Blob, nom: string) {
@@ -22,9 +23,41 @@ const jourDe = (iso: string) => iso.slice(0, 10).split('-').length === 3 ? (() =
 })() : iso;
 
 /** Onglet « Réalisations » : tournées clôturées, avec leur rapport PDF et leur .zip. */
-export default function Realisations({ rapports, onSupprimer }: Props) {
+export default function Realisations({ rapports, photos, onSupprimer, onMajRapport }: Props) {
   const [espace, setEspace] = useState<string>('');
   const [message, setMessage] = useState<{ txt: string; cls: string } | null>(null);
+  const [reconstruction, setReconstruction] = useState<string | null>(null);
+  // Tournées clôturées avant la conservation du .zip : nombre d'images encore présentes sur le téléphone
+  const [disponibles, setDisponibles] = useState<Record<string, number>>({});
+  useEffect(() => {
+    (async () => {
+      const r: Record<string, number> = {};
+      for (const x of rapports.filter((y) => !y.zipCle)) {
+        let n = 0;
+        for (const p of photos.filter((q) => q.tourneeId === x.id)) if (await lireBlob(p.id)) n++;
+        r[x.id] = n;
+      }
+      setDisponibles(r);
+    })();
+  }, [rapports, photos]);
+
+  /** Reconstitue le .zip d'une tournée clôturée avant la mise à jour, à partir des images restées sur le téléphone. */
+  const reconstituer = async (r: Rapport) => {
+    setReconstruction(r.id); setMessage(null);
+    try {
+      const pdf = r.pdfUri ? await lireBlob(r.pdfUri) : undefined;
+      const f = await creerZip(photos.filter((p) => p.tourneeId === r.id), r.zipNom.replace(/\.zip$/, ''), r.intervenant,
+        pdf ? new File([pdf], `Rapport_${r.intervenant.replace(/\s+/g, '_')}_${r.id}.pdf`, { type: 'application/pdf' }) : undefined);
+      await ecrireBlob(`zip:${r.id}`, f);
+      onMajRapport({ ...r, zipCle: `zip:${r.id}` });
+      telecharger(f, f.name);
+      setMessage({ txt: `.zip reconstitué (${disponibles[r.id]} photo(s)) et conservé dans cette réalisation.`, cls: 'vert' });
+    } catch (e) {
+      setMessage({ txt: `Reconstitution impossible : ${String(e)}`, cls: 'rouge' });
+    } finally {
+      setReconstruction(null);
+    }
+  };
   useEffect(() => {
     navigator.storage?.estimate?.().then((e) => e.usage != null && setEspace(`${(e.usage / 1048576).toFixed(0)} Mo utilisés sur ce téléphone`)).catch(() => {});
   }, [rapports]);
@@ -82,11 +115,28 @@ export default function Realisations({ rapports, onSupprimer }: Props) {
                 {r.avancementPlan?.total ? <div className="aide">Avancement du plan de route à la clôture : {r.avancementPlan.pct} %</div> : null}
                 <div className="actions">
                   <button className="btn contour petit" onClick={() => ouvrir(r, 'pdf')}>⬇ Rapport PDF</button>
-                  <button className="btn contour petit" disabled={!r.zipCle} onClick={() => ouvrir(r, 'zip')}>⬇ Photos (.zip)</button>
+                  {r.zipCle || !disponibles[r.id] ? (
+                    <button className="btn contour petit" disabled={!r.zipCle} onClick={() => ouvrir(r, 'zip')}>⬇ Photos (.zip)</button>
+                  ) : (
+                    <button className="btn plein petit" disabled={!!reconstruction} onClick={() => reconstituer(r)}>
+                      {reconstruction === r.id ? 'Reconstitution…' : `↻ Reconstituer le .zip (${disponibles[r.id]} photos)`}
+                    </button>
+                  )}
                 </div>
-                <button className="lien-petit" onClick={() => {
-                  if (confirm('Supprimer cette tournée clôturée de ce téléphone (PDF et .zip) ? Pensez à les avoir envoyés au préalable.')) onSupprimer(r);
-                }}>Supprimer de ce téléphone</button>
+                {!r.zipCle && disponibles[r.id] === 0 && (
+                  <div className="aide">.zip non conservé (tournée clôturée avant la mise à jour) et photos plus présentes sur ce téléphone :
+                    utilisez le .zip envoyé par mail ce jour-là.</div>
+                )}
+                <button className="btn texte-rouge petit-supprimer" onClick={() => {
+                  if (confirm(
+                    `Supprimer de ce téléphone la tournée du ${dateFR(r.debutISO).slice(0, 10)} : rapport PDF, photos et .zip ?\n\n`
+                    + '⚠️ ATTENTION : si les photos n\'ont pas été envoyées à STATERA, elles seront perdues. '
+                    + 'Un nouveau passage sur site pourra alors être exigé pour que ces photos soient payées.\n\n'
+                    + 'Confirmez-vous que le .zip a bien été envoyé à STATERA ?',
+                  )) onSupprimer(r);
+                }}>🗑 Supprimer de ce téléphone (rapport, photos et .zip)</button>
+                <p className="aide avertissement">Ne supprimez qu'après avoir envoyé le .zip à STATERA : sans les photos, un repassage sur site
+                  peut être exigé pour paiement.</p>
               </article>
             );
           })}
