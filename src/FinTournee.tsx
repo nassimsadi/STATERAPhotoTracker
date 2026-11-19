@@ -56,7 +56,7 @@ export default function FinTournee({ photosTournee, rapports, avancementPlan, on
 
   const envoyerZip = async () => {
     if (!zip) return;
-    const r = await partagerFichier(zip, 'STATERA PhotoTracker – Photos de site', `Bonjour,\n\nVeuillez trouver ci-joint ${photosTournee.length} photo(s) de site classées par département et par ville, avec un récapitulatif (recapitulatif.csv).\n\nCordialement,\n${intervenant}`);
+    const r = await partagerFichier(zip, 'STATERA PhotoTracker – Photos de site', `Bonjour,\n\nVeuillez trouver ci-joint ${photosTournee.length} photo(s) de site classées par département et par ville, avec un récapitulatif Excel (recapitulatif.xlsx).\n\nCordialement,\n${intervenant}`);
     if (r !== 'annule') setZipEnvoye(true);
     if (r === 'telechargement') setMessage({ txt: 'Le .zip a été téléchargé : joignez-le à un mail depuis vos Téléchargements.', cls: 'orange' });
   };

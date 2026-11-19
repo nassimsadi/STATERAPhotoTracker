@@ -144,6 +144,7 @@ export default function Capture({ etape, onEnregistree, onFermer }: Props) {
         adresse: adresse.trim(), codePostal: codePostal.trim(), ville: ville.trim(),
         departement: departement.trim() || libelleDepartement(null), note: note.trim(), etapeId: etape?.id,
         siteRef: etape?.nom || undefined,
+        datePrevue: etape?.date || undefined,
         etapeAdresse: etape ? `${etape.adresse}|${etape.codePostal}|${etape.ville}` : undefined,
       }, continuer);
       if (continuer) { setImage(null); setPositionPhoto(null); }

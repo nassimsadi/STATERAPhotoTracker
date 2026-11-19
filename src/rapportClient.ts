@@ -4,6 +4,7 @@ import autoTable from 'jspdf-autotable';
 import JSZip from 'jszip';
 import { dateFR, gpsTexte, horodatageFichier, nomSur } from './format';
 import { lireImage } from './validationDb';
+import { classeurExcel, dateExcel, heure, type Colonne, type Valeur } from './excel';
 import { LIBELLE_STATUT, type LigneSite, type PhotoRecue, type StatutSite } from './rapprochement';
 
 export type InfosRapport = {
@@ -176,14 +177,18 @@ export async function construirePdfClient(r: Resultat, infos: InfosRapport, logo
   return new File([doc.output('blob')], `${nom}.pdf`, { type: 'application/pdf' });
 }
 
-const csv = (v: string | number | null | undefined) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
 /** Dossier livrable : rapport PDF + photos validées classées par site + récapitulatif (Excel). */
 export async function construireLivrable(r: Resultat, infos: InfosRapport, pdf: File, progression?: (t: string) => void): Promise<File> {
   const zip = new JSZip();
   zip.file(pdf.name, pdf);
-  const lignes = [['Réf. site', 'Adresse', 'Code postal', 'Commune', 'Statut', 'Date de passage', 'Photos validées', 'Latitude', 'Longitude', 'Fichiers', 'Observation']
-    .map(csv).join(';')];
+  const colonnes: Colonne[] = [
+    { titre: 'Réf. site', largeur: 12 }, { titre: 'Adresse', largeur: 32 }, { titre: 'Code postal', largeur: 10 }, { titre: 'Commune', largeur: 18 },
+    { titre: 'Date de passage prévue', largeur: 13 }, { titre: 'Statut', largeur: 20 }, { titre: 'Date de passage', largeur: 13 }, { titre: 'Heure', largeur: 8 },
+    { titre: 'Photos validées', largeur: 9 }, { titre: 'Latitude', largeur: 11 }, { titre: 'Longitude', largeur: 11 },
+    { titre: 'Fichiers', largeur: 60 }, { titre: 'Observation', largeur: 40 },
+  ];
+  const lignes: Valeur[][] = [];
   let k = 0;
   const total = r.lignes.reduce((t, l) => t + l.validees.length, 0);
   for (const l of r.lignes) {
@@ -198,9 +203,9 @@ export async function construireLivrable(r: Resultat, infos: InfosRapport, pdf: 
       fichiers.push(f);
     }
     const p0 = l.validees[0];
-    lignes.push([l.etape.nom, l.etape.adresse, l.etape.codePostal, l.etape.ville, LIBELLE_STATUT[l.statut],
-      l.datePassage ? dateFR(l.datePassage) : '', l.validees.length, p0?.latitude, p0?.longitude, fichiers.join(' | '),
-      l.photos.map((p) => p.commentaire).filter(Boolean).join(' ; ')].map(csv).join(';'));
+    lignes.push([l.etape.nom, l.etape.adresse, l.etape.codePostal, l.etape.ville, dateExcel(l.etape.date), LIBELLE_STATUT[l.statut],
+      dateExcel(l.datePassage), heure(l.datePassage), l.validees.length, p0?.latitude, p0?.longitude, fichiers.join(' | '),
+      l.photos.map((p) => p.commentaire).filter(Boolean).join(' ; ')]);
   }
   if (infos.avecHorsPlan) {
     for (const p of r.horsPlan.filter((x) => x.statut === 'validee' || x.statut === 'validee_auto')) {
@@ -208,7 +213,7 @@ export async function construireLivrable(r: Resultat, infos: InfosRapport, pdf: 
       if (b) zip.file(`Photos/_Hors_plan/${horodatageFichier(p.dateISO)}_${nomSur(p.ville)}.jpg`, b);
     }
   }
-  zip.file('Recapitulatif_sites.csv', '﻿' + lignes.join('\r\n'));
+  zip.file('Recapitulatif_sites.xlsx', await classeurExcel('Sites', colonnes, lignes));
   const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE', mimeType: 'application/zip' });
   return new File([blob], pdf.name.replace(/\.pdf$/, '.zip'), { type: 'application/zip' });
 }

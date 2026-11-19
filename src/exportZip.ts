@@ -1,22 +1,28 @@
 import JSZip from 'jszip';
 import { lireBlob } from './db';
-import { dateFR, horodatageFichier, nomSur } from './format';
+import { horodatageFichier, nomSur } from './format';
+import { classeurExcel, dateExcel, heure, type Colonne, type Valeur } from './excel';
 import type { PhotoRecord } from './types';
 
-const csv = (v: string | number | null | undefined) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
 /**
  * .zip organisé ainsi :
  *   <Departement>/<Ville>/<AAAAMMJJ_hhmmss>_<Ville>.jpg
- *   recapitulatif.csv (ouvrable dans Excel)
+ *   recapitulatif.xlsx (Excel)
  */
 export async function creerZip(photos: PhotoRecord[], titre: string, intervenant = '', rapportPdf?: File): Promise<File> {
   const zip = new JSZip();
   if (rapportPdf) zip.file(rapportPdf.name, rapportPdf);   // rapport de fin de tournée de l'intervenant
-  const lignes = [[
-    'Département', 'Ville', 'Code postal', 'Adresse', 'Date', 'Latitude smartphone', 'Longitude smartphone', 'Précision (m)',
-    'Latitude adresse', 'Longitude adresse', 'Écart (m)', 'Adresse validée', 'Motif de vérification', 'Note', 'Fichier', 'Google Maps',
-  ].map(csv).join(';')];
+  const colonnes: Colonne[] = [
+    { titre: 'Département', largeur: 22 }, { titre: 'Ville', largeur: 18 }, { titre: 'Code postal', largeur: 10 },
+    { titre: 'Adresse', largeur: 32 }, { titre: 'Réf. site', largeur: 12 }, { titre: 'Date de passage prévue', largeur: 13 },
+    { titre: 'Date de passage', largeur: 13 }, { titre: 'Heure', largeur: 8 },
+    { titre: 'Latitude smartphone', largeur: 12 }, { titre: 'Longitude smartphone', largeur: 12 }, { titre: 'Précision (m)', largeur: 10 },
+    { titre: 'Latitude adresse', largeur: 12 }, { titre: 'Longitude adresse', largeur: 12 }, { titre: 'Écart (m)', largeur: 9 },
+    { titre: 'Adresse validée', largeur: 11 }, { titre: 'Motif de vérification', largeur: 34 }, { titre: 'Note', largeur: 24 },
+    { titre: 'Fichier', largeur: 50 }, { titre: 'Google Maps', largeur: 40 },
+  ];
+  const lignes: Valeur[][] = [];
   const noms = new Set<string>();
   const donnees: (PhotoRecord & { cheminZip: string })[] = [];
   for (const p of photos) {
@@ -30,13 +36,13 @@ export async function creerZip(photos: PhotoRecord[], titre: string, intervenant
     zip.file(chemin, blob);
     donnees.push({ ...p, cheminZip: chemin });
     lignes.push([
-      p.departement, p.ville, p.codePostal, p.adresse, dateFR(p.dateISO), p.latitude, p.longitude,
-      p.precision != null ? Math.round(p.precision) : '', p.latitudeSite, p.longitudeSite, p.ecartM,
+      p.departement, p.ville, p.codePostal, p.adresse, p.siteRef ?? '', dateExcel(p.datePrevue), dateExcel(p.dateISO), heure(p.dateISO),
+      p.latitude, p.longitude, p.precision != null ? Math.round(p.precision) : null, p.latitudeSite, p.longitudeSite, p.ecartM,
       p.conformite === 'conforme' ? 'Oui' : 'À VÉRIFIER', p.motifVerification ?? '', p.note, chemin,
       p.latitude != null ? `https://maps.google.com/?q=${p.latitude},${p.longitude}` : '',
-    ].map(csv).join(';'));
+    ]);
   }
-  zip.file('recapitulatif.csv', '\uFEFF' + lignes.join('\r\n'));
+  zip.file('recapitulatif.xlsx', await classeurExcel('Photos', colonnes, lignes));
   // Données lues par l'espace « Validation responsable »
   zip.file('donnees-validation.json', JSON.stringify({ format: 'statera-photos-v1', intervenant, creeLe: new Date().toISOString(), photos: donnees }));
   const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE', mimeType: 'application/zip' });

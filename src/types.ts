@@ -19,6 +19,7 @@ export type PhotoRecord = {
   tourneeId?: string;     // renseigné quand la tournée est clôturée
   etapeId?: string;       // étape du plan de route photographiée
   siteRef?: string;       // référence du site dans le plan (colonne « Site »)
+  datePrevue?: string;    // date de passage prévue au plan (AAAA-MM-JJ)
   etapeAdresse?: string;  // adresse d'origine de l'étape : « adresse|CP|ville »
 };
 
