@@ -76,7 +76,8 @@ export default function Facturation() {
           <span className="aide">Tournée du {dateFR(releve.periode.debut).slice(0, 10)} au {dateFR(releve.periode.fin).slice(0, 10)} · {releve.intervenant}</span>
           <span className="aide">{releve.nbPayees} photo(s) validée(s) × {eur(releve.tarif)}
             {releve.refusees ? ` · ${releve.refusees} refusée(s)` : ''}{releve.enAttente ? ` · ${releve.enAttente} en attente` : ''}</span>
-          <div className="kpi total"><b>{eur(releve.montant)} HT</b><span>à facturer à {releve.client.raisonSociale || 'STATERA Networks'}</span></div>
+          <div className="kpi total"><b>{eur(releve.montant)} HT</b><span>à facturer à {releve.client.raisonSociale || 'STATERA Networks'}
+            {profil.regimeTva === 'tva20' ? ` + TVA 20 % = ${eur(releve.montant * 1.2)} TTC` : ' (TVA non applicable)'}</span></div>
           <button className="btn plein" onClick={facturer}>Générer ma facture</button>
         </div>
       )}
@@ -102,11 +103,14 @@ export default function Facturation() {
             <div style={{ flex: 2 }}>{champ('ville', 'Ville *')}</div>
           </div>
           {champ('siret', 'SIRET *', 'numeric')}
-          <label className="champ"><span>Régime de TVA *</span>
-            <select value={profil.regimeTva} onChange={(e) => majProfil({ ...profil, regimeTva: e.target.value as ProfilFacturation['regimeTva'] })}>
-              <option value="franchise">Micro-entrepreneur : TVA non applicable (art. 293 B du CGI)</option>
-              <option value="tva20">Assujetti à la TVA (20 %)</option>
-            </select></label>
+          <label className="case case-tva">
+            <input type="checkbox" checked={profil.regimeTva === 'tva20'}
+              onChange={(e) => majProfil({ ...profil, regimeTva: e.target.checked ? 'tva20' : 'franchise' })} />
+            <span><b>Je suis soumis à la TVA</b>
+              <small>{profil.regimeTva === 'tva20'
+                ? 'Facture : 5,00 € HT par photo + TVA 20 % (1,00 €), soit 6,00 € TTC par photo.'
+                : 'Non coché : 5,00 € par photo, TVA non applicable (art. 293 B du CGI, micro-entrepreneur).'}</small></span>
+          </label>
           {profil.regimeTva === 'tva20' && champ('numeroTva', 'N° de TVA intracommunautaire')}
           {champ('iban', 'IBAN *')}
           {champ('bic', 'BIC')}

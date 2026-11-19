@@ -85,9 +85,12 @@ export function construireFacture(numero: string, p: ProfilFacturation, r: Donne
   const L = 210, M = 15;
   const maintenant = new Date();
   const echeance = new Date(maintenant.getTime() + 30 * 86400000);
+  // Prix convenu : 5 € HT par photo validée. TVA 20 % en sus si l'intervenant y est soumis (récupérable par STATERA).
+  const soumis = p.regimeTva === 'tva20';
   const ht = Math.round(r.nbPayees * r.tarif * 100) / 100;
-  const tva = p.regimeTva === 'tva20' ? Math.round(ht * 20) / 100 : 0;
-  const ttc = ht + tva;
+  const tva = soumis ? Math.round(ht * 20) / 100 : 0;
+  const ttc = Math.round((ht + tva) * 100) / 100;
+  const puHT = r.tarif;
   const periode = `du ${dateFR(r.periode.debut).slice(0, 10)} au ${dateFR(r.periode.fin).slice(0, 10)}`;
 
   // Émetteur
@@ -121,7 +124,8 @@ export function construireFacture(numero: string, p: ProfilFacturation, r: Donne
   autoTable(doc, {
     startY: 100, margin: { left: M, right: M },
     head: [['Désignation', 'Quantité', 'Prix unitaire HT', 'Total HT']],
-    body: [[`Relevés photographiques de sites validés – tournée ${periode}`, String(r.nbPayees), eur(r.tarif), eur(ht)]],
+    body: [[`Relevés photographiques de sites validés – tournée ${periode}`, String(r.nbPayees),
+      eur(puHT), eur(ht)]],
     styles: { fontSize: 9.5, cellPadding: 3 },
     headStyles: { fillColor: SARCELLE, textColor: [255, 255, 255] },
     columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } },
@@ -142,7 +146,7 @@ export function construireFacture(numero: string, p: ProfilFacturation, r: Donne
 
   doc.setFontSize(8.5); doc.setTextColor(80, 80, 80);
   const mentions = [
-    p.regimeTva === 'franchise' ? 'TVA non applicable, art. 293 B du CGI.' : '',
+    soumis ? `Prix convenu : ${eur(r.tarif)} HT par photo validée, TVA 20 % en sus.` : 'TVA non applicable, art. 293 B du CGI.',
     `Règlement par virement à 30 jours, soit au plus tard le ${echeance.toLocaleDateString('fr-FR')}.`,
     `IBAN : ${p.iban}${p.bic ? `   BIC : ${p.bic}` : ''}`,
     'Escompte pour paiement anticipé : néant. En cas de retard de paiement : pénalités au taux de 3 fois le taux d\'intérêt légal '

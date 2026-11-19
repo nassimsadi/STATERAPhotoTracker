@@ -80,7 +80,7 @@ export function construireReleve(t: TourneeImportee, responsable: string, logo?:
   if (y > 262) { doc.addPage(); y = 25; }
   doc.setFillColor(234, 242, 240); doc.roundedRect(M, y, L - 2 * M, 22, 2, 2, 'F');
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor(...SARCELLE);
-  doc.text(`Bon pour facturation : ${euros(tt.montant)} HT (${tt.payees} photo(s) x ${euros(TARIF_PHOTO_EUR)})`, M + 4, y + 7);
+  doc.text(`Bon pour facturation : ${euros(tt.montant)} HT (${tt.payees} photo(s) x ${euros(TARIF_PHOTO_EUR)} HT, TVA en sus le cas échéant)`, M + 4, y + 7);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(80, 80, 80);
   doc.text(doc.splitTextToSize("L'intervenant importe ce relevé dans STATERA PhotoTracker (onglet Réalisations > Facturer un relevé) "
     + `pour générer sa facture, adressée à ${client.raisonSociale || 'STATERA Networks'}.`, L - 2 * M - 8), M + 4, y + 13);

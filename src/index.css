@@ -260,3 +260,7 @@ h1, h2, h3, h4 { margin: 0; }
 .facturation h3 { font-size: 17px; }
 .releve-apercu { background: var(--sarcelle-fond); border-color: #CFE2DD; gap: 4px; }
 .champ select { width: 100%; border: 1px solid var(--bord); border-radius: 12px; padding: 12px 10px; font-size: 15px; background: #FAFBFB; color: var(--texte); }
+
+.case-tva { background: var(--sarcelle-fond); border-radius: 12px; padding: 10px; }
+.case-tva span { display: flex; flex-direction: column; gap: 2px; }
+.case-tva small { color: var(--gris); font-size: 13px; }

@@ -251,7 +251,7 @@ function DetailTournee({ t, onChange, onRetour }: { t: TourneeImportee; onChange
           {!releve ? (
             <button className="btn plein" onClick={generer}>Générer le relevé de validation (PDF)</button>
           ) : (
-            <button className="btn plein" onClick={() => partagerFichier(releve, 'Relevé de validation', `Relevé de validation – ${t.intervenant} : ${euros(tt.montant)} HT bon pour facturation. Importez ce relevé dans STATERA PhotoTracker (onglet Réalisations > Facturer un relevé) pour générer votre facture.`)}>
+            <button className="btn plein" onClick={() => partagerFichier(releve, 'Relevé de validation', `Relevé de validation – ${t.intervenant} : ${euros(tt.montant)} HT bon pour facturation (TVA en sus le cas échéant). Importez ce relevé dans STATERA PhotoTracker (onglet Réalisations > Facturer un relevé) pour générer votre facture.`)}>
               Envoyer le relevé (mail, Drive…)
             </button>
           )}
