@@ -14,12 +14,9 @@ type Vue = 'jour' | 'semaine' | 'tout';
 
 export default function Plan({ plan, photos, onImporter, onPhotographier }: Props) {
   const aujourdhui = jourISO(new Date());
-  const [vue, setVue] = useState<Vue>('jour');
-  // Jour affiché par défaut : aujourd'hui s'il a des étapes, sinon la prochaine journée planifiée.
-  const [jour, setJour] = useState(() => {
-    if (plan.some((e) => e.date === aujourdhui)) return aujourdhui;
-    return plan.map((e) => e.date).filter((d) => d > aujourdhui).sort()[0] ?? aujourdhui;
-  });
+  // Vue par défaut : « Jour » si le plan est daté, sinon « Tout ».
+  const [vue, setVue] = useState<Vue>(() => (plan.some((e) => e.date) ? 'jour' : 'tout'));
+  const [jour, setJour] = useState(() => jourParDefaut(plan, aujourdhui));
   const [info, setInfo] = useState<{ txt: string; cls: string } | null>(null);
   const fichier = useRef<HTMLInputElement>(null);
 
@@ -36,9 +33,16 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
       if (!etapes.length) throw new Error('Aucune étape trouvée dans le fichier.');
       if (plan.length && !confirm(`Remplacer le plan actuel (${plan.length} étapes) par ce fichier (${etapes.length} étapes) ?`)) return;
       onImporter(etapes);
-      const premier = etapes.find((e) => e.date >= aujourdhui)?.date ?? etapes[0].date;
-      if (premier) setJour(premier);
-      setInfo({ txt: `Plan importé : ${etapes.length} étape(s).`, cls: 'vert' });
+      setJour(jourParDefaut(etapes, aujourdhui));
+      setVue(etapes.some((e) => e.date) ? 'jour' : 'tout');
+      const dates = etapes.map((e) => e.date).filter(Boolean).sort();
+      const sansDate = etapes.length - dates.length;
+      setInfo({
+        txt: `Plan importé : ${etapes.length} étape(s)`
+          + (dates.length ? `, du ${libelleJour(dates[0])} au ${libelleJour(dates[dates.length - 1])}` : '')
+          + (sansDate ? ` · ${sansDate} sans date (affichées chaque jour)` : ''),
+        cls: 'vert',
+      });
     } catch (e) {
       setInfo({ txt: e instanceof Error ? e.message : String(e), cls: 'rouge' });
     }
@@ -46,8 +50,12 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
 
   const debutSemaine = lundi(jour);
   const finSemaine = ajouterJours(debutSemaine, 6);
-  const duJour = plan.filter((e) => e.date === jour);
-  const deLaSemaine = plan.filter((e) => e.date >= debutSemaine && e.date <= finSemaine);
+  // Les étapes sans date sont affichées dans toutes les vues.
+  const duJour = plan.filter((e) => e.date === jour || !e.date);
+  const deLaSemaine = plan.filter((e) => (e.date >= debutSemaine && e.date <= finSemaine) || !e.date);
+  const datees = [...new Set(plan.map((e) => e.date).filter(Boolean))].sort();
+  const suivante = datees.find((d) => d > (vue === 'semaine' ? finSemaine : jour));
+  const precedente = [...datees].reverse().find((d) => d < (vue === 'semaine' ? debutSemaine : jour));
   const visibles = vue === 'jour' ? duJour : vue === 'semaine' ? deLaSemaine : plan;
   const groupes = useMemo(() => {
     const m = new Map<string, EtapePlan[]>();
@@ -57,7 +65,7 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
 
   const entreeFichier = (
     <input ref={fichier} type="file" hidden
-      accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+      accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
       onChange={(e) => { importer(e.target.files?.[0]); e.target.value = ''; }} />
   );
 
@@ -112,11 +120,18 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
       )}
 
       {info && <div className={`alerte ${info.cls}`}>{info.txt}</div>}
-      {visibles.length === 0 && <p className="aide centre">Aucune étape prévue sur cette période.</p>}
+      {visibles.length === 0 && (
+        <div className="carte">
+          <p className="aide centre">Aucune étape prévue {vue === 'semaine' ? 'cette semaine' : 'ce jour'}.</p>
+          {suivante && <button className="btn plein petit" onClick={() => setJour(suivante)}>Étapes suivantes : {libelleJour(suivante)} ›</button>}
+          {precedente && <button className="btn contour petit" onClick={() => setJour(precedente)}>‹ Étapes précédentes : {libelleJour(precedente)}</button>}
+          <button className="btn contour petit" onClick={() => setVue('tout')}>Voir tout le plan ({plan.length} étapes)</button>
+        </div>
+      )}
 
       {groupes.map(([date, etapes]) => (
         <section key={date || 'sans'}>
-          {vue !== 'jour' && (
+          {(vue !== 'jour' || !date) && (
             <h4 className="titre-jour">{date ? libelleJour(date) : 'Sans date'} · {avancement(etapes, photos).pct} %</h4>
           )}
           {etapes.map((e) => {
@@ -167,4 +182,11 @@ function lienItineraire(e: EtapePlan) {
   return /iPhone|iPad|iPod/.test(navigator.userAgent)
     ? `https://maps.apple.com/?daddr=${dest}`
     : `https://www.google.com/maps/dir/?api=1&destination=${dest}`;
+}
+
+/** Aujourd'hui s'il a des étapes, sinon la prochaine journée planifiée, sinon la dernière. */
+function jourParDefaut(plan: EtapePlan[], aujourdhui: string): string {
+  const dates = plan.map((e) => e.date).filter(Boolean).sort();
+  if (dates.includes(aujourdhui)) return aujourdhui;
+  return dates.find((d) => d > aujourdhui) ?? dates[dates.length - 1] ?? aujourdhui;
 }

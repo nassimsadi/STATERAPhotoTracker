@@ -18,11 +18,12 @@ export default function App() {
   const [photos, setPhotos] = useState<PhotoRecord[]>([]);
   const [plan, setPlan] = useState<EtapePlan[]>([]);
   const [rapports, setRapports] = useState<Rapport[]>([]);
+  const [charge, setCharge] = useState(false);
 
   useEffect(() => {
-    chargerPhotos().then(setPhotos);
-    chargerPlan().then(setPlan);
-    chargerRapports().then(setRapports);
+    Promise.all([chargerPhotos(), chargerPlan(), chargerRapports()]).then(([ph, pl, ra]) => {
+      setPhotos(ph); setPlan(pl); setRapports(ra); setCharge(true);
+    });
     demanderPersistance();
   }, []);
   useEffect(() => { window.scrollTo(0, 0); }, [ecran.nom, onglet]);
@@ -76,7 +77,7 @@ export default function App() {
         </nav>
       </header>
       <Installation />
-      {onglet === 'plan'
+      {!charge ? <main className="contenu"><p className="aide centre">Chargement…</p></main> : onglet === 'plan'
         ? <Plan plan={plan} photos={photos} onImporter={(p) => { setPlan(p); enregistrerPlan(p); }} onPhotographier={photographier} />
         : <Photos photos={photosTournee} onSupprimer={supprimer} />}
       <footer className="barre-bas">

@@ -36,7 +36,9 @@ async function appeler(chemin: string): Promise<Feature[]> {
   let derniere: unknown;
   for (const base of SERVEURS) {
     try {
-      const r = await fetch(`${base}${chemin}`, { signal: AbortSignal.timeout(10000) });
+      const ctrl = new AbortController();
+      const minuteur = setTimeout(() => ctrl.abort(), 10000);   // compatible iOS anciens
+      const r = await fetch(`${base}${chemin}`, { signal: ctrl.signal }).finally(() => clearTimeout(minuteur));
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return ((await r.json()).features ?? []) as Feature[];
     } catch (e) { derniere = e; }

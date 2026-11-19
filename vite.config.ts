@@ -5,6 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 // base './' : l'appli fonctionne quel que soit l'emplacement d'hébergement.
 export default defineConfig({
   base: './',
+  build: { target: ['es2020', 'safari14', 'chrome87'] },
   plugins: [
     react(),
     VitePWA({

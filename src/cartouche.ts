@@ -30,7 +30,15 @@ export async function chargerImage(fichier: Blob): Promise<ImageBitmap> {
   try {
     return await createImageBitmap(fichier, { imageOrientation: 'from-image' });
   } catch {
-    return await createImageBitmap(fichier);
+    try { return await createImageBitmap(fichier); } catch { /* iOS < 15 : repli via <img> */ }
+    const url = URL.createObjectURL(fichier);
+    try {
+      const img = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext('2d')!.drawImage(img, 0, 0);
+      return await createImageBitmap(c).catch(() => c as unknown as ImageBitmap);
+    } finally { URL.revokeObjectURL(url); }
   }
 }
 
@@ -109,9 +117,8 @@ export async function dessiner(canvas: HTMLCanvasElement, img: ImageBitmap, info
     const lw = 24 * u, lh = (lw * lg.height) / lg.width, p = 1.4 * u;
     ctx.fillStyle = 'rgba(255,255,255,0.92)';
     const x = 2 * u, yy = 2 * u, r = 1.2 * u;
-    ctx.beginPath();
-    ctx.roundRect(x, yy, lw + 2 * p, lh + 2 * p, r);
-    ctx.fill();
+    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x, yy, lw + 2 * p, lh + 2 * p, r); ctx.fill(); }
+    else ctx.fillRect(x, yy, lw + 2 * p, lh + 2 * p);
     ctx.drawImage(lg, x + p, yy + p, lw, lh);
   } catch { /* logo absent : on continue */ }
 }

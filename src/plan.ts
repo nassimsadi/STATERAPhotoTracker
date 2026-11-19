@@ -61,17 +61,31 @@ const ALIAS: Record<keyof Omit<EtapePlan, 'id'>, string[]> = {
 };
 
 /** Accepte JJ/MM/AAAA, JJ/MM/AA, JJ-MM-AAAA, AAAA-MM-JJ et les dates Excel (numéro de série). */
+const MOIS_FR: Record<string, number> = {
+  janv: 1, janvier: 1, fevr: 2, fev: 2, fevrier: 2, mars: 3, avr: 4, avril: 4, mai: 5, juin: 6, juil: 7, juillet: 7,
+  aout: 8, sept: 9, septembre: 9, oct: 10, octobre: 10, nov: 11, novembre: 11, dec: 12, decembre: 12,
+};
+
+/**
+ * Accepte : JJ/MM/AAAA, JJ/MM/AA, JJ/MM (année en cours), AAAA-MM-JJ, « lundi 24/11/2026 »,
+ * « 24 novembre 2026 », et les dates Excel (numéro de série).
+ */
 export function lireDate(s: string): string {
   const t = s.trim();
-  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
-  m = t.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/);
-  if (m) {
-    const a = m[3].length === 2 ? `20${m[3]}` : m[3];
-    return `${a}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  const iso = (a: number, m: number, j: number) =>
+    m >= 1 && m <= 12 && j >= 1 && j <= 31 ? `${a}-${String(m).padStart(2, '0')}-${String(j).padStart(2, '0')}` : '';
+  let m = t.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return iso(+m[1], +m[2], +m[3]);
+  m = t.match(/(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{2,4}))?/);
+  if (m && !/^\d{5}$/.test(t)) {
+    const a = m[3] ? (m[3].length === 2 ? 2000 + +m[3] : +m[3]) : new Date().getFullYear();
+    return iso(a, +m[2], +m[1]);
   }
-  if (/^\d{5}$/.test(t)) {
-    const d = new Date(Date.UTC(1899, 11, 30) + Number(t) * 86400000);
+  const sans = t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  m = sans.match(/(\d{1,2})(?:er)?\s+([a-z]+)\.?(?:\s+(\d{4}))?/);
+  if (m && MOIS_FR[m[2]]) return iso(m[3] ? +m[3] : new Date().getFullYear(), MOIS_FR[m[2]], +m[1]);
+  if (/^\d{5}(\.\d+)?$/.test(t)) {
+    const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(Number(t)) * 86400000);
     return d.toISOString().slice(0, 10);
   }
   return '';

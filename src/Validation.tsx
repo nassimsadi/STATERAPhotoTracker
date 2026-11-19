@@ -67,6 +67,8 @@ export default function Validation() {
         </div>
         {message && <div className={`alerte ${message.cls}`}>{message.txt}</div>}
 
+        <a className="btn contour" href="./" onClick={() => { location.hash = ''; }}>Ouvrir l'appli intervenant (plan de route, photos)</a>
+
         {tournees.map((x) => {
           const tt = totaux(x, TARIF_PHOTO_EUR);
           return (
