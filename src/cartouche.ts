@@ -1,8 +1,8 @@
 // Composition de la photo finale : image redimensionnée + cartouche d'informations (sans logo).
-// Sortie : JPEG, 1600 px sur le grand côté, qualité 0,6 (≈ 200 à 400 Ko).
+// Sortie : JPEG, 1280 px sur le grand côté, qualité 0,55 (≈ 100 à 250 Ko pour une photo de terrain).
 
-export const GRAND_COTE = 1600;
-export const QUALITE_JPEG = 0.6;
+export const GRAND_COTE = 1280;
+export const QUALITE_JPEG = 0.55;
 
 export type InfosCartouche = {
   adresse: string;
