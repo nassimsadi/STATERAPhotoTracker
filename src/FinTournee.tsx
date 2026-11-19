@@ -16,7 +16,7 @@ type Props = {
 
 export default function FinTournee({ photosTournee, rapports, avancementPlan, onCloturer, onRetour }: Props) {
   const [intervenant, setIntervenant] = useState('');
-  useEffect(() => { lireIntervenant().then(setIntervenant); }, []);
+  useEffect(() => { lireIntervenant().then((v) => setIntervenant((actuel) => actuel || v)); }, []);
   const bilan = useMemo(() => bilanTournee(photosTournee, intervenant.trim()), [photosTournee, intervenant]);
 
   const [zip, setZip] = useState<File | null>(null);

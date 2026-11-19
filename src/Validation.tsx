@@ -9,11 +9,13 @@ import {
 } from './validationDb';
 import { TARIF_PHOTO_EUR, type PhotoRecord } from './types';
 import { get, set } from 'idb-keyval';
+import RapportClient from './RapportClient';
 
 /** Espace « Validation responsable » : ouvert avec l'adresse de l'appli suivie de #validation. */
 export default function Validation() {
   const [tournees, setTournees] = useState<TourneeImportee[]>([]);
   const [ouverte, setOuverte] = useState<string | null>(null);
+  const [rapportClient, setRapportClient] = useState(false);
   const [message, setMessage] = useState<{ txt: string; cls: string } | null>(null);
   const [import_, setImport] = useState(false);
   const fichier = useRef<HTMLInputElement>(null);
@@ -38,6 +40,7 @@ export default function Validation() {
     }
   };
 
+  if (rapportClient) return <RapportClient tournees={tournees} onRetour={() => setRapportClient(false)} />;
   const t = tournees.find((x) => x.cle === ouverte);
   if (t) {
     return <DetailTournee t={t} onRetour={() => setOuverte(null)}
@@ -67,6 +70,12 @@ export default function Validation() {
         </div>
         {message && <div className={`alerte ${message.cls}`}>{message.txt}</div>}
 
+        <div className="carte">
+          <h2>Rapport donneur d'ordre</h2>
+          <p className="aide">Compare le plan de route transmis avec les tournées reçues, puis prépare le rapport final
+            (PDF + photos validées classées par site) à envoyer au client.</p>
+          <button className="btn plein" onClick={() => setRapportClient(true)}>Préparer le rapport final</button>
+        </div>
         <div className="carte">
           <h2>Préparer un plan de route</h2>
           <p className="aide">Modèle Excel à remplir puis à envoyer à l'intervenant. Colonnes obligatoires : Adresse, Code postal, Ville.
@@ -100,7 +109,7 @@ function DetailTournee({ t, onChange, onRetour }: { t: TourneeImportee; onChange
   const [responsable, setResponsable] = useState('');
   const [releve, setReleve] = useState<File | null>(null);
   const [grande, setGrande] = useState<PhotoRecord | null>(null);
-  useEffect(() => { get<string>('statera-responsable').then((v) => v && setResponsable(v)); }, []);
+  useEffect(() => { get<string>('statera-responsable').then((v) => v && setResponsable((a) => a || v)); }, []);
 
   const tt = totaux(t, TARIF_PHOTO_EUR);
   const visibles = t.photos

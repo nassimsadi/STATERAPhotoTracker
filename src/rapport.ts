@@ -37,7 +37,7 @@ export function construirePdf(r: Rapport, photos: PhotoRecord[], logo?: { dataUr
   const L = 210, M = 15;
 
   // En-tête
-  if (logo) doc.addImage(logo.dataUrl, 'PNG', M, 12, 50, 50 / logo.ratio);
+  if (logo) doc.addImage(logo.dataUrl, 'JPEG', M, 12, 50, 50 / logo.ratio);
   else { doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.text('STATERA Networks', M, 20); }
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...GRIS);
   doc.text(`Rapport n° ${r.id}`, L - M, 16, { align: 'right' });
@@ -145,9 +145,14 @@ export function construirePdf(r: Rapport, photos: PhotoRecord[], logo?: { dataUr
 export async function chargerLogoPdf(): Promise<{ dataUrl: string; ratio: number } | undefined> {
   try {
     const b = await (await fetch(`${import.meta.env.BASE_URL}logo-statera.png`)).blob();
-    const dataUrl = await new Promise<string>((res) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.readAsDataURL(b); });
+    // Logo réduit (600 px) sur fond blanc, en JPEG : quelques dizaines de Ko au lieu de 2 Mo
     const bmp = await createImageBitmap(b);
-    return { dataUrl, ratio: bmp.width / bmp.height };
+    const c = document.createElement('canvas');
+    c.width = 600; c.height = Math.round((600 * bmp.height) / bmp.width);
+    const ctx = c.getContext('2d')!;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(bmp, 0, 0, c.width, c.height);
+    return { dataUrl: c.toDataURL('image/jpeg', 0.9), ratio: bmp.width / bmp.height };
   } catch {
     return undefined;
   }

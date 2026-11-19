@@ -53,3 +53,10 @@ export function totaux(t: TourneeImportee, tarif: number) {
     payees, montant: payees * tarif,
   };
 }
+
+// ---------- Rapport donneur d'ordre ----------
+export const chargerPlanClient = async () => (await get<import('./types').EtapePlan[]>('planClient', meta)) ?? [];
+export const enregistrerPlanClient = (p: import('./types').EtapePlan[]) => set('planClient', p, meta);
+export type InfosClient = { donneurOrdre: string; reference: string; redacteur: string; nomFichierPlan: string };
+export const chargerInfosClient = async () => (await get<InfosClient>('infosClient', meta)) ?? { donneurOrdre: '', reference: '', redacteur: '', nomFichierPlan: '' };
+export const enregistrerInfosClient = (i: InfosClient) => set('infosClient', i, meta);

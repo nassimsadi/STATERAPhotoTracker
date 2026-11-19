@@ -18,6 +18,8 @@ export type PhotoRecord = {
   note: string;           // commentaire libre
   tourneeId?: string;     // renseigné quand la tournée est clôturée
   etapeId?: string;       // étape du plan de route photographiée
+  siteRef?: string;       // référence du site dans le plan (colonne « Site »)
+  etapeAdresse?: string;  // adresse d'origine de l'étape : « adresse|CP|ville »
 };
 
 export type Rapport = {

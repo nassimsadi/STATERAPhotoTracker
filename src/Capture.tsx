@@ -143,6 +143,8 @@ export default function Capture({ etape, onEnregistree, onFermer }: Props) {
         motifVerification: motif || undefined,
         adresse: adresse.trim(), codePostal: codePostal.trim(), ville: ville.trim(),
         departement: departement.trim() || libelleDepartement(null), note: note.trim(), etapeId: etape?.id,
+        siteRef: etape?.nom || undefined,
+        etapeAdresse: etape ? `${etape.adresse}|${etape.codePostal}|${etape.ville}` : undefined,
       }, continuer);
       if (continuer) { setImage(null); setPositionPhoto(null); }
     } catch (e) {
