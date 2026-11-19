@@ -18,7 +18,7 @@ export function construireReleve(t: TourneeImportee, responsable: string, logo?:
 
   if (logo) doc.addImage(logo.dataUrl, 'PNG', M, 12, 50, 50 / logo.ratio);
   doc.setFontSize(9); doc.setTextColor(107, 114, 112);
-  doc.text(`Établi le ${dateFR(maintenant)}`, L - M, 16, { align: 'right' });
+  doc.text(`STATERA PhotoTracker · ${dateFR(maintenant)}`, L - M, 16, { align: 'right' });
   doc.setDrawColor(...SARCELLE); doc.setLineWidth(0.8); doc.line(M, 27, L - M, 27);
   doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(28, 28, 28);
   doc.text('Relevé de validation des photos', M, 38);

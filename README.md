@@ -1,4 +1,6 @@
-# STATERA Networks – Photos de site (application web installable)
+# STATERA PhotoTracker
+
+Application web installable de photos de site.
 
 Fonctionne sur iPhone et Android, sans store : on ouvre le lien, puis « Ajouter à l'écran d'accueil ».
 

@@ -26,7 +26,7 @@ export async function importerZip(f: File): Promise<TourneeImportee> {
   let zip: JSZip;
   try { zip = await JSZip.loadAsync(f); } catch { throw new Error("Ce fichier n'est pas un .zip valide."); }
   const json = zip.file('donnees-validation.json');
-  if (!json) throw new Error("Ce .zip ne vient pas de l'appli STATERA Photos (fichier donnees-validation.json absent).");
+  if (!json) throw new Error("Ce .zip ne vient pas de l'appli STATERA PhotoTracker (fichier donnees-validation.json absent).");
   const d = JSON.parse(await json.async('string')) as { intervenant: string; creeLe: string; photos: (PhotoRecord & { cheminZip: string })[] };
   const cle = `${d.intervenant}|${d.creeLe}`;
   for (const p of d.photos) {

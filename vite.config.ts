@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['logo-statera.png', 'apple-touch-icon.png', 'favicon.png', 'plan-de-route-modele.xlsx'],
       manifest: {
-        name: 'STATERA Networks – Photos de site',
-        short_name: 'STATERA Photos',
+        name: 'STATERA PhotoTracker',
+        short_name: 'PhotoTracker',
         description: 'Photos de site géolocalisées, plan de route et rapports de tournée.',
         lang: 'fr',
         start_url: './',

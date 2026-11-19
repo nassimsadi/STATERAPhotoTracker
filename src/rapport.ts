@@ -41,7 +41,7 @@ export function construirePdf(r: Rapport, photos: PhotoRecord[], logo?: { dataUr
   else { doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.text('STATERA Networks', M, 20); }
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...GRIS);
   doc.text(`Rapport n° ${r.id}`, L - M, 16, { align: 'right' });
-  doc.text(`Généré le ${dateFR(r.dateISO)}`, L - M, 21, { align: 'right' });
+  doc.text(`STATERA PhotoTracker · ${dateFR(r.dateISO)}`, L - M, 21, { align: 'right' });
   doc.setDrawColor(...SARCELLE); doc.setLineWidth(0.8); doc.line(M, 27, L - M, 27);
 
   doc.setTextColor(28, 28, 28); doc.setFont('helvetica', 'bold'); doc.setFontSize(18);

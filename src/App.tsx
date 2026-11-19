@@ -65,6 +65,7 @@ export default function App() {
     <div className="ecran">
       <header className="entete">
         <img src={`${import.meta.env.BASE_URL}logo-statera.png`} alt="STATERA Networks" className="logo" />
+        <div className="nom-appli">PhotoTracker</div>
         <nav className="onglets">
           <button className={onglet === 'plan' ? 'actif' : ''} onClick={() => setOnglet('plan')}>
             Plan de route{av ? ` · ${av.pct} %` : ''}

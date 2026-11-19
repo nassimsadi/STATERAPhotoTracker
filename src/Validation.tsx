@@ -48,6 +48,7 @@ export default function Validation() {
     <div className="ecran">
       <header className="entete">
         <img src={`${import.meta.env.BASE_URL}logo-statera.png`} alt="STATERA Networks" className="logo" />
+        <div className="nom-appli">PhotoTracker</div>
         <div className="titre-espace">Validation responsable</div>
       </header>
       <main className="contenu" style={{ paddingBottom: 40 }}>
