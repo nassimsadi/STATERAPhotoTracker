@@ -11,6 +11,7 @@ import { TARIF_PHOTO_EUR, type PhotoRecord } from './types';
 import { get, set } from 'idb-keyval';
 import RapportClient from './RapportClient';
 import DocumentsPdf from './DocumentsPdf';
+import Installation from './Installation';
 
 /** Espace « Validation responsable » : ouvert avec l'adresse de l'appli suivie de #validation. */
 export default function Validation() {
@@ -57,6 +58,7 @@ export default function Validation() {
         <div className="nom-appli">PhotoTracker</div>
         <div className="titre-espace">Validation responsable</div>
       </header>
+      <Installation />
       <main className="contenu" style={{ paddingBottom: 40 }}>
         <input ref={fichier} type="file" accept=".zip,application/zip" hidden onChange={(e) => { importer(e.target.files?.[0]); e.target.value = ''; }} />
         <div className="carte">

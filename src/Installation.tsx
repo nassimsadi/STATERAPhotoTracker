@@ -10,13 +10,23 @@ const lireMasque = () => { try { return localStorage.getItem('install-masque') =
 /** Bandeau expliquant comment ajouter l'appli à l'écran d'accueil (affiché seulement dans le navigateur). */
 export default function Installation() {
   const [invitation, setInvitation] = useState<InvitationInstall | null>(null);
-  const [masque, setMasque] = useState(() => estInstallee() || lireMasque());
+  const [masque, setMasque] = useState(lireMasque);
   useEffect(() => {
     const f = (e: Event) => { e.preventDefault(); setInvitation(e as InvitationInstall); };
     window.addEventListener('beforeinstallprompt', f);
     return () => window.removeEventListener('beforeinstallprompt', f);
   }, []);
-  if (masque) return null;
+  // Déjà ouverte comme appli installée (depuis l'icône) : rien à proposer
+  if (estInstallee()) return null;
+  const installer = async () => { if (invitation) { await invitation.prompt(); setInvitation(null); } };
+  // Bandeau fermé : un petit bouton reste disponible pour réafficher l'aide ou lancer l'installation
+  if (masque) {
+    return (
+      <button className="install-mini" onClick={() => (invitation ? installer() : setMasque(false))}>
+        📲 Installer l'appli sur ce téléphone
+      </button>
+    );
+  }
 
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
   const fermer = () => { try { localStorage.setItem('install-masque', '1'); } catch { /* */ } setMasque(true); };
@@ -26,7 +36,7 @@ export default function Installation() {
       <button className="install-fermer" onClick={fermer} aria-label="Fermer">✕</button>
       <b>Installez l'appli sur votre téléphone</b>
       {invitation ? (
-        <button className="btn plein petit" onClick={async () => { await invitation.prompt(); setInvitation(null); }}>Installer l'appli</button>
+        <button className="btn plein petit" onClick={installer}>Installer l'appli</button>
       ) : ios ? (
         <ol>
           <li>Ouvrez cette page dans <b>Safari</b>.</li>
