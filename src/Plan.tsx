@@ -159,6 +159,12 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
       ))}
 
       <button className="btn contour" onClick={() => fichier.current?.click()}>Importer un nouveau plan (Excel)</button>
+      <button className="btn texte-rouge" onClick={() => {
+        if (confirm(`Supprimer tout le plan de route (${plan.length} étapes) ?\n\nLes photos déjà prises sont conservées dans la tournée.`)) {
+          onImporter([]);
+          setInfo(null);
+        }
+      }}>🗑 Supprimer le plan de route</button>
     </main>
   );
 }
