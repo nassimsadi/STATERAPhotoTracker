@@ -10,6 +10,7 @@ const jourLocal = (iso: string) => {
 /** Raisons pour lesquelles une photo mérite un regard (liste vide = rien d'inhabituel). */
 export function anomalies(p: PhotoRecord, toutes: PhotoRecord[]): string[] {
   const r: string[] = [];
+  if (p.signalement === 'adresse_inexistante') r.push(`Adresse signalée inexistante par l'intervenant${p.observation ? ` (« ${p.observation} »)` : ''}`);
   if (p.ecartM != null && p.ecartM > 1000) r.push(`Prise à ${distanceTexte(p.ecartM)} de l'adresse`);
   else if (p.ecartM != null && p.ecartM > 300) r.push(`Écart de ${distanceTexte(p.ecartM)} avec l'adresse`);
   if (p.motifVerification?.startsWith('Adresse introuvable')) r.push('Adresse introuvable');

@@ -70,7 +70,7 @@ export default function RapportClient({ tournees, onRetour }: { tournees: Tourne
       + `${resultat.synthese.realises}/${resultat.synthese.prevus} sites réalisés (${resultat.synthese.taux} %).\n\nCordialement,\n${infos.redacteur}\nSTATERA Networks`
     : '';
 
-  const lignes = resultat?.lignes.filter((l) => filtre === 'tous' || (filtre === 'realise' ? l.statut === 'realise' : l.statut !== 'realise')) ?? [];
+  const lignes = resultat?.lignes.filter((l) => filtre === 'tous' || (filtre === 'realise' ? l.statut === 'realise' || l.statut === 'inexistante' : l.statut !== 'realise' && l.statut !== 'inexistante')) ?? [];
 
   return (
     <div className="ecran">
@@ -118,7 +118,7 @@ export default function RapportClient({ tournees, onRetour }: { tournees: Tourne
             </div>
             <div className="kpi total"><b>{resultat.synthese.taux} %</b><span>taux de réalisation</span></div>
             <p className="aide">
-              {resultat.synthese.nonRealises} non réalisé(s) · {resultat.synthese.aReprendre} à reprendre · {resultat.synthese.enAttente} en cours de validation
+              {resultat.synthese.inexistantes} adresse(s) inexistante(s) · {resultat.synthese.nonRealises} non réalisé(s) · {resultat.synthese.aReprendre} à reprendre · {resultat.synthese.enAttente} en cours de validation
               · {resultat.synthese.horsPlan} photo(s) hors plan
             </p>
 
@@ -129,7 +129,7 @@ export default function RapportClient({ tournees, onRetour }: { tournees: Tourne
             </div>
             <ol className="liste-jour">
               {lignes.map((l) => (
-                <li key={l.etape.id} className={l.statut === 'realise' ? 'fait' : ''}>
+                <li key={l.etape.id} className={l.statut === 'realise' ? 'fait' : l.statut === 'inexistante' ? 'inexistante' : ''}>
                   <span className={`pastille-statut ${l.statut}`}>{icone(l.statut)}</span>
                   <span className="liste-texte">
                     <b>{l.etape.nom ? `${l.etape.nom} · ` : ''}{l.etape.adresse}</b>
@@ -168,5 +168,5 @@ export default function RapportClient({ tournees, onRetour }: { tournees: Tourne
   );
 }
 
-const icone = (s: StatutSite) => ({ realise: '✓', en_attente: '⏳', a_reprendre: '↻', non_realise: '✕' }[s]);
+const icone = (s: StatutSite) => ({ realise: '✓', inexistante: '🚫', en_attente: '⏳', a_reprendre: '↻', non_realise: '✕' }[s]);
 const taille = (f: File) => `${(f.size / 1048576).toFixed(1)} Mo`;

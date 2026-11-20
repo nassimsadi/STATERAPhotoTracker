@@ -219,7 +219,10 @@ function DetailTournee({ t, onChange, onRetour }: { t: TourneeImportee; onChange
               <button className="img-bouton" onClick={() => setGrande(p)}><ImageValidation cle={t.cle} id={p.id} /></button>
               <div className="gras">{p.adresse}</div>
               <div className="aide">{p.codePostal} {p.ville} · {p.departement} · {dateFR(p.dateISO)}</div>
-              {p.conformite !== 'conforme' && <div className="alerte orange">Motif : {p.motifVerification ?? 'adresse non validée'}</div>}
+              {p.signalement === 'adresse_inexistante' ? (
+                <div className="alerte signalement-alerte">🚫 <b>Adresse inexistante signalée</b> par l'intervenant.<br />Constat : « {p.observation} »
+                  <br /><small>Validez si la photo prouve son passage à l'emplacement (il sera payé) ; refusez sinon.</small></div>
+              ) : p.conformite !== 'conforme' && <div className="alerte orange">Motif : {p.motifVerification ?? 'adresse non validée'}</div>}
               <div className="aide">GPS adresse : <b>{gpsTexte(p.latitudeSite ?? null, p.longitudeSite ?? null)}</b></div>
               <div className="aide">GPS smartphone : <b>{gpsTexte(p.latitude, p.longitude)}</b>{p.precision != null ? ` (±${Math.round(p.precision)} m)` : ''}</div>
               {p.ecartM != null && <div className="aide">Écart : <b>{distanceTexte(p.ecartM)}</b></div>}

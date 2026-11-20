@@ -267,3 +267,16 @@ h1, h2, h3, h4 { margin: 0; }
 
 .conseil-cadrage { display: flex; flex-direction: column; gap: 4px; background: var(--sarcelle-fond); border-radius: 12px; padding: 12px 14px; font-size: 14px; line-height: 1.45; }
 .conseil-cadrage b:first-child { color: var(--sarcelle); font-size: 15px; }
+
+/* Signalement d'adresse inexistante */
+.signalement.actif { border: 2px solid #E07B00; background: #FFF8EE; }
+.signalement .case span { display: flex; flex-direction: column; gap: 2px; }
+.signalement .case small { color: var(--gris); font-size: 13px; }
+.champ textarea { width: 100%; border: 1px solid var(--bord); border-radius: 12px; padding: 12px 14px; font: inherit; font-size: 16px; background: #FAFBFB; resize: vertical; }
+.badge-inexistante { color: #B35A00; font-weight: 800; font-size: 14px; margin-top: 4px; }
+.num.inexistante { background: #E07B00 !important; font-size: 15px; }
+
+.pastille-statut.inexistante { background: #E07B00; font-size: 14px; }
+.liste-jour li.inexistante { background: #FFF8EE; border-color: #F1C38B; }
+.signalement-alerte { background: #FFF1DE; color: #8A4B00; }
+.signalement-alerte small { font-weight: 600; }

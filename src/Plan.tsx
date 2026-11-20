@@ -10,10 +10,11 @@ type Props = {
   photos: PhotoRecord[];
   onImporter: (p: EtapePlan[]) => void;
   onPhotographier: (e: EtapePlan) => void;
+  onSignaler: (e: EtapePlan) => void;
 };
 type Vue = 'jour' | 'semaine' | 'tout';
 
-export default function Plan({ plan, photos, onImporter, onPhotographier }: Props) {
+export default function Plan({ plan, photos, onImporter, onPhotographier, onSignaler }: Props) {
   const aujourdhui = jourISO(new Date());
   // Vue par défaut : « Jour » si le plan est daté, sinon « Tout ».
   const [vue, setVue] = useState<Vue>(() => (plan.some((e) => e.date) ? 'jour' : 'tout'));
@@ -22,6 +23,7 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
   const fichier = useRef<HTMLInputElement>(null);
   const [calcul, setCalcul] = useState<string | null>(null);
 
+  const signalees = useMemo(() => new Set(photos.filter((p) => p.signalement && p.etapeId).map((p) => p.etapeId!)), [photos]);
   const nbParEtape = useMemo(() => {
     const m = new Map<string, number>();
     photos.forEach((p) => p.etapeId && m.set(p.etapeId, (m.get(p.etapeId) ?? 0) + 1));
@@ -157,20 +159,24 @@ export default function Plan({ plan, photos, onImporter, onPhotographier }: Prop
             return (
               <article key={e.id} className={`carte etape ${nb ? 'faite' : ''}`}>
                 <div className="etape-haut">
-                  <div className={`num ${nb ? 'ok' : ''}`}>{nb ? '✓' : e.ordre}</div>
+                  <div className={`num ${nb ? 'ok' : ''} ${signalees.has(e.id) ? 'inexistante' : ''}`}>{signalees.has(e.id) ? '🚫' : nb ? '✓' : e.ordre}</div>
                   <div style={{ flex: 1 }}>
                     {e.nom && <div className="ref">{e.nom}</div>}
                     <div className="gras">{e.adresse || '—'}</div>
                     <div className="aide">{[e.codePostal, e.ville].filter(Boolean).join(' ')}</div>
                     {e.consigne && <div className="consigne">⚠︎ {e.consigne}</div>}
                     {e.nonLocalisee && <div className="consigne">Adresse introuvable : vérifiez-la (itinéraire approximatif).</div>}
-                    {nb > 0 && <div className="fait">{nb} photo{nb > 1 ? 's' : ''} prise{nb > 1 ? 's' : ''}</div>}
+                    {signalees.has(e.id) ? <div className="badge-inexistante">🚫 Adresse inexistante signalée</div>
+                      : nb > 0 && <div className="fait">{nb} photo{nb > 1 ? 's' : ''} prise{nb > 1 ? 's' : ''}</div>}
                   </div>
                 </div>
                 <div className="actions">
                   <a className="btn contour petit" href={lienItineraire(e)} target="_blank" rel="noreferrer">Itinéraire</a>
                   <button className="btn plein petit" onClick={() => onPhotographier(e)}>📷 {nb ? 'Encore' : 'Photo'}</button>
                 </div>
+                {!signalees.has(e.id) && (
+                  <button className="lien-petit" onClick={() => onSignaler(e)}>🚫 Signaler une adresse inexistante</button>
+                )}
               </article>
             );
           })}

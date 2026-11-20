@@ -12,11 +12,13 @@ type Props = {
   photos: PhotoRecord[];
   onMajPlan: (p: EtapePlan[]) => void;
   onPhotographier: (e: EtapePlan) => void;
+  onSignaler: (e: EtapePlan) => void;
   onAllerAuPlan: () => void;
 };
 
 /** Onglet « Tournée du jour » : carte, parcours optimisé, navigation et prochaine étape. */
-export default function TourneeJour({ plan, photos, onMajPlan, onPhotographier, onAllerAuPlan }: Props) {
+export default function TourneeJour({ plan, photos, onMajPlan, onPhotographier, onSignaler, onAllerAuPlan }: Props) {
+  const signalees = useMemo(() => new Set(photos.filter((p) => p.signalement && p.etapeId).map((p) => p.etapeId!)), [photos]);
   const aujourdhui = jourISO(new Date());
   const [jour, setJour] = useState(() => jourParDefaut(plan, aujourdhui));
   const [calcul, setCalcul] = useState<string | null>(null);
@@ -114,6 +116,7 @@ export default function TourneeJour({ plan, photos, onMajPlan, onPhotographier, 
                 <a className="btn contour petit" href={lienItineraire(prochaine)} target="_blank" rel="noreferrer">Itinéraire</a>
                 <button className="btn plein petit" onClick={() => onPhotographier(prochaine)}>📷 Photo</button>
               </div>
+              <button className="lien-petit" onClick={() => onSignaler(prochaine)}>🚫 Signaler une adresse inexistante</button>
             </div>
           ) : (
             <div className="alerte vert">Tournée terminée : toutes les étapes ont été photographiées. Pensez à la « Fin de tournée ».</div>
@@ -125,8 +128,8 @@ export default function TourneeJour({ plan, photos, onMajPlan, onPhotographier, 
               const n = nb.get(e.id) ?? 0;
               return (
                 <li key={e.id} className={n ? 'fait' : e === prochaine ? 'courante' : ''}>
-                  <span className={`num ${n ? 'ok' : ''}`}>{n ? '✓' : i + 1}</span>
-                  <span className="liste-texte"><b>{e.adresse}</b><small>{e.codePostal} {e.ville}{e.nom ? ` · ${e.nom}` : ''}</small></span>
+                  <span className={`num ${n ? 'ok' : ''} ${signalees.has(e.id) ? 'inexistante' : ''}`}>{signalees.has(e.id) ? '🚫' : n ? '✓' : i + 1}</span>
+                  <span className="liste-texte"><b>{e.adresse}</b><small>{e.codePostal} {e.ville}{e.nom ? ` · ${e.nom}` : ''}{signalees.has(e.id) ? ' · adresse inexistante signalée' : ''}</small></span>
                   <button className="mini" onClick={() => onPhotographier(e)} aria-label="Prendre une photo">📷</button>
                 </li>
               );

@@ -19,7 +19,7 @@ type Resultat = ReturnType<typeof import('./rapprochement').rapprocher>;
 const SARCELLE: [number, number, number] = [46, 94, 88];
 const GRIS: [number, number, number] = [107, 114, 112];
 const COULEUR: Record<StatutSite, [number, number, number]> = {
-  realise: [42, 138, 85], en_attente: [138, 90, 0], a_reprendre: [179, 38, 30], non_realise: [179, 38, 30],
+  realise: [42, 138, 85], inexistante: [179, 90, 0], en_attente: [138, 90, 0], a_reprendre: [179, 38, 30], non_realise: [179, 38, 30],
 };
 
 /** Vignette JPEG légère (600 px) pour la planche photos. */
@@ -68,10 +68,11 @@ export async function construirePdfClient(r: Resultat, infos: InfosRapport, logo
     [String(s.prevus), 'sites demandés', false],
     [String(s.realises), 'sites réalisés', false],
     [`${s.taux} %`, 'taux de réalisation', true],
+    [String(s.inexistantes), 'adresses inexistantes', false],
     [String(s.aReprendre + s.enAttente), 'à reprendre / en cours', false],
     [String(s.nonRealises), 'non réalisés', false],
   ];
-  const lk = (L - 2 * M - 4 * 3) / 5;
+  const lk = (L - 2 * M - 5 * 3) / 6;
   y += 3;
   kpis.forEach(([v, lib, fort], i) => {
     const x = M + i * (lk + 3);
@@ -105,8 +106,28 @@ export async function construirePdfClient(r: Resultat, infos: InfosRapport, logo
   });
   y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
 
+  // ---- Adresses inexistantes constatées sur place ----
+  const inex = r.lignes.filter((l) => l.statut === 'inexistante');
+  if (inex.length) {
+    if (y > 240) { doc.addPage(); y = 20; }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(179, 90, 0);
+    doc.text(`Adresses inexistantes constatées sur place (${inex.length})`, M, y);
+    autoTable(doc, {
+      startY: y + 3, margin: { left: M, right: M },
+      head: [['Réf.', 'Adresse demandée', 'Commune', 'Date du constat', 'Constat']],
+      body: inex.map((l) => [l.etape.nom || '-', l.etape.adresse, `${l.etape.codePostal} ${l.etape.ville}`,
+        l.datePassage ? dateFR(l.datePassage).slice(0, 16) : '-', l.validees.map((p) => p.observation).filter(Boolean).join(' ; ')]),
+      styles: { fontSize: 8, cellPadding: 1.8 },
+      headStyles: { fillColor: [255, 241, 222], textColor: [138, 75, 0] },
+    });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...GRIS);
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4;
+    doc.text("Photo de l'emplacement jointe dans la planche photographique.", M, y);
+    y += 8;
+  }
+
   // ---- Sites non réalisés / à reprendre ----
-  const pb = r.lignes.filter((l) => l.statut !== 'realise');
+  const pb = r.lignes.filter((l) => l.statut !== 'realise' && l.statut !== 'inexistante');
   if (pb.length) {
     if (y > 240) { doc.addPage(); y = 20; }
     doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(179, 38, 30);
@@ -158,6 +179,10 @@ export async function construirePdfClient(r: Resultat, infos: InfosRapport, logo
         }
         doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(28, 28, 28);
         doc.text(`${l.etape.nom ? `${l.etape.nom} – ` : ''}${l.etape.adresse}`.slice(0, 70), x, yy + hImg + 5);
+        if (p.signalement) {
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(179, 90, 0);
+          doc.text(`ADRESSE INEXISTANTE${p.observation ? ` – ${p.observation}` : ''}`.slice(0, 85), x, yy + hImg + 13.5);
+        }
         doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...GRIS);
         doc.text(`${l.etape.codePostal} ${l.etape.ville} · ${dateFR(p.dateISO).slice(0, 16)} · GPS ${gpsTexte(p.latitude, p.longitude)}`, x, yy + hImg + 9.5);
         i++;
@@ -209,7 +234,8 @@ export async function construireLivrable(r: Resultat, infos: InfosRapport, pdf: 
     const p0 = l.validees[0];
     lignes.push([l.etape.nom, l.etape.adresse, l.etape.codePostal, l.etape.ville, dateExcel(l.etape.date), LIBELLE_STATUT[l.statut],
       dateExcel(l.datePassage), heure(l.datePassage), l.validees.length, p0?.latitude, p0?.longitude, fichiers.join(' | '),
-      l.photos.map((p) => p.commentaire).filter(Boolean).join(' ; ')]);
+      [l.statut === 'inexistante' ? `Constat : ${l.validees.map((p) => p.observation).filter(Boolean).join(' ; ')}` : '',
+        ...l.photos.map((p) => p.commentaire)].filter(Boolean).join(' ; ')]);
   }
   if (infos.avecHorsPlan) {
     for (const p of r.horsPlan.filter((x) => x.statut === 'validee' || x.statut === 'validee_auto')) {

@@ -8,11 +8,15 @@ import type { EtapePlan, PhotoRecord } from './types';
 
 type Props = {
   etape: EtapePlan | null;
+  signalementInitial?: boolean;   // ouvert depuis le bouton « Adresse inexistante »
   onEnregistree: (r: PhotoRecord, continuer: boolean) => void;
   onFermer: () => void;
 };
 
-export default function Capture({ etape, onEnregistree, onFermer }: Props) {
+export default function Capture({ etape, signalementInitial, onEnregistree, onFermer }: Props) {
+  // ---- Signalement d'adresse inexistante ----
+  const [signalement, setSignalement] = useState(!!signalementInitial);
+  const [observation, setObservation] = useState('');
   // ---- GPS du smartphone (suivi continu tant que l'écran est ouvert) ----
   const [position, setPosition] = useState<Position | null>(null);
   const [erreurGps, setErreurGps] = useState('');
@@ -91,13 +95,15 @@ export default function Capture({ etape, onEnregistree, onFermer }: Props) {
   const conforme = ecart != null && ecart <= tol;
 
   // Motif de vérification manuelle (adresse non validée automatiquement)
-  const motif = conforme ? ''
+  const motif = signalement ? `Adresse inexistante signalée${observation.trim() ? ` : ${observation.trim()}` : ''}`
+    : conforme ? ''
     : site?.etat === 'introuvable' ? 'Adresse introuvable'
     : site?.etat === 'hors_ligne' ? 'Position non vérifiable (hors réseau)'
     : ecart != null ? `Écart de ${distanceTexte(ecart)} avec l'adresse (tolérance ${Math.round(tol)} m)`
     : '';
   const conformite: InfosCartouche['conformite'] =
-    conforme ? { texte: `Adresse validée ✓ · écart ${Math.round(ecart!)} m`, ok: true }
+    signalement ? { texte: 'ADRESSE INEXISTANTE SIGNALÉE', ok: false }
+    : conforme ? { texte: `Adresse validée ✓ · écart ${Math.round(ecart!)} m`, ok: true }
     : motif ? { texte: `À VÉRIFIER · ${motif}`, ok: false }
     : { texte: 'Contrôle de position…', ok: null };
 
@@ -111,9 +117,9 @@ export default function Capture({ etape, onEnregistree, onFermer }: Props) {
       gpsSmartphone: pos ? `${gpsTexte(pos.latitude, pos.longitude)} (±${Math.round(pos.precision)} m)` : 'en attente…',
       conformite,
       date: dateFR(dateISO),
-      note,
+      note: [signalement && observation.trim() ? `Constat : ${observation.trim()}` : '', note].filter(Boolean).join(' · '),
     });
-  }, [image, adresse, codePostal, ville, departement, note, site, pos, dateISO, conformite.texte]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [image, adresse, codePostal, ville, departement, note, site, pos, dateISO, conformite.texte, signalement, observation]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- Enregistrement ----
   const [enCours, setEnCours] = useState<null | 'suite' | 'seul'>(null);
@@ -126,8 +132,12 @@ export default function Capture({ etape, onEnregistree, onFermer }: Props) {
       !ville.trim() ? 'ville' : null,
     ].filter(Boolean);
     if (manquants.length) return setMessage(`Il manque : ${manquants.join(', ')}. Chaque photo doit comporter la date, l'heure, la localisation et les coordonnées GPS.`);
-    if (calculSite || !site) return setMessage("Patientez : calcul des coordonnées de l'adresse en cours…");
-    if (!conforme && !confirm(
+    if (signalement) {
+      if (!observation.trim()) return setMessage("Décrivez ce que vous constatez sur place (ex. : « numéro inexistant, la rue s'arrête au n° 10 »).");
+      if (!confirm("Signalement d'adresse inexistante : cette photo sert de preuve de votre passage.\n\n"
+        + 'Il sera vérifié par STATERA avant paiement. Enregistrer le signalement ?')) return;
+    } else if (calculSite || !site) return setMessage("Patientez : calcul des coordonnées de l'adresse en cours…");
+    else if (!conforme && !confirm(
       `Adresse non validée : ${motif}.\n\nLa photo sera enregistrée mais NE SERA PAS PAYÉE automatiquement : `
       + 'elle sera vérifiée par votre responsable.\n\nEnregistrer quand même ?')) return;
     setMessage('');
@@ -139,9 +149,11 @@ export default function Capture({ etape, onEnregistree, onFermer }: Props) {
       await ecrireBlob(`${id}:brute`, await versJpegBrut(image!));   // version sans cartouche
       onEnregistree({
         id, fichier: `${id}.jpg`, dateISO, latitude: pos!.latitude, longitude: pos!.longitude, precision: pos!.precision,
-        latitudeSite: site.etat === 'ok' ? site.latitude : null, longitudeSite: site.etat === 'ok' ? site.longitude : null,
-        ecartM: ecart != null ? Math.round(ecart) : null, conformite: conforme ? 'conforme' : 'a_verifier',
+        latitudeSite: site?.etat === 'ok' ? site.latitude : null, longitudeSite: site?.etat === 'ok' ? site.longitude : null,
+        ecartM: ecart != null ? Math.round(ecart) : null, conformite: conforme && !signalement ? 'conforme' : 'a_verifier',
         motifVerification: motif || undefined,
+        signalement: signalement ? 'adresse_inexistante' : undefined,
+        observation: signalement ? observation.trim() : undefined,
         adresse: adresse.trim(), codePostal: codePostal.trim(), ville: ville.trim(),
         departement: departement.trim() || libelleDepartement(null), note: note.trim(), etapeId: etape?.id,
         siteRef: etape?.nom || undefined,
@@ -164,7 +176,7 @@ export default function Capture({ etape, onEnregistree, onFermer }: Props) {
     <div className="ecran">
       <header className="barre-haut">
         <button className="lien" onClick={onFermer}>‹ Retour</button>
-        <h1>{image ? 'Vérifier et enregistrer' : 'Nouvelle photo'}</h1>
+        <h1>{signalement ? 'Adresse inexistante' : image ? 'Vérifier et enregistrer' : 'Nouvelle photo'}</h1>
         <span style={{ width: 70 }} />
       </header>
       <main className="contenu">
@@ -183,7 +195,8 @@ export default function Capture({ etape, onEnregistree, onFermer }: Props) {
 
         {!image ? (
           <>
-            <button className="btn plein enorme" onClick={() => entree.current?.click()}>📷  Prendre la photo</button>
+            {signalement && <div className="alerte orange">Photographiez l'endroit où devrait se trouver l'adresse : cette photo prouve votre passage.</div>}
+            <button className="btn plein enorme" onClick={() => entree.current?.click()}>📷  {signalement ? 'Photographier l\'endroit' : 'Prendre la photo'}</button>
             <div className="conseil-cadrage">
               <b>Cadrez tout le site</b>
               <span>Reculez pour que l'ensemble soit visible (armoire, façade, abords). Si besoin, passez l'appareil photo
@@ -206,7 +219,22 @@ export default function Capture({ etape, onEnregistree, onFermer }: Props) {
               <p className="aide">GPS smartphone : <b>{pos ? `${gpsTexte(pos.latitude, pos.longitude)} (±${Math.round(pos.precision)} m)` : 'en attente…'}</b></p>
               <p className="aide">GPS de l'adresse : <b>{calculSite ? 'calcul…' : site?.etat === 'ok' ? gpsTexte(site.latitude, site.longitude) : '—'}</b>
                 {site?.etat === 'ok' && site.libelle ? <> <br />({site.libelle})</> : null}</p>
-              <Conformite calcul={calculSite} site={site} ecart={ecart} conforme={conforme} tol={tol} gpsOk={!!pos} />
+              {!signalement && <Conformite calcul={calculSite} site={site} ecart={ecart} conforme={conforme} tol={tol} gpsOk={!!pos} />}
+            </div>
+            <div className={`carte signalement ${signalement ? 'actif' : ''}`}>
+              <label className="case">
+                <input type="checkbox" checked={signalement} onChange={(e) => setSignalement(e.target.checked)} />
+                <span><b>🚫 L'adresse n'existe pas sur place</b>
+                  <small>Signalez-le : la photo de l'endroit sert de preuve de votre passage. Vérifié par STATERA avant paiement.</small></span>
+              </label>
+              {signalement && (
+                <label className="champ"><span>Ce que vous constatez *</span>
+                  <textarea rows={3} value={observation} onChange={(e) => setObservation(e.target.value)}
+                    placeholder="Ex. : la rue s'arrête au n° 10 ; terrain vague ; aucune armoire à cet emplacement…" /></label>
+              )}
+              {!signalement && site?.etat === 'introuvable' && (
+                <p className="aide">L'adresse est introuvable : si elle n'existe pas sur place, cochez la case ci-dessus.</p>
+              )}
             </div>
             {message && <div className="alerte rouge">{message}</div>}
             <button className="btn plein" disabled={!!enCours} onClick={() => enregistrer(true)}>

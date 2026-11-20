@@ -78,7 +78,8 @@ export function construirePdf(r: Rapport, photos: PhotoRecord[], logo?: { dataUr
       v.photos.forEach((p) => sites.set(cleSite(p), [...(sites.get(cleSite(p)) ?? []), p]));
       for (const ps of sites.values()) {
         const ok = ps.filter(estValidee).length;
-        corps.push([g.departement, v.ville, ps[0].adresse || '-', ok === ps.length ? 'Validée' : `${ps.length - ok} à vérifier`,
+        corps.push([g.departement, v.ville, ps[0].adresse || '-',
+          ps.some((x) => x.signalement) ? 'Inexistante (signalée)' : ok === ps.length ? 'Validée' : `${ps.length - ok} à vérifier`,
           String(ps.length), euros(ok * r.tarifUnitaire)]);
       }
     }
@@ -94,7 +95,7 @@ export function construirePdf(r: Rapport, photos: PhotoRecord[], logo?: { dataUr
     footStyles: { fillColor: SARCELLE, textColor: [255, 255, 255], fontStyle: 'bold' },
     columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right' } },
     didParseCell: (d) => {
-      if (d.section === 'body' && d.column.index === 3 && String(d.cell.raw) !== 'Validée') d.cell.styles.textColor = [179, 38, 30];
+      if (d.section === 'body' && d.column.index === 3 && String(d.cell.raw) !== 'Validée') d.cell.styles.textColor = String(d.cell.raw).startsWith('Inexistante') ? [179, 90, 0] : [179, 38, 30];
       if (d.section === 'foot' && d.column.index >= 4) d.cell.styles.halign = 'right';
     },
   });
@@ -109,6 +110,24 @@ export function construirePdf(r: Rapport, photos: PhotoRecord[], logo?: { dataUr
     `Photos transmises dans l'archive : ${r.zipNom}`,
   ].filter(Boolean);
   notes.forEach((t) => { doc.text(doc.splitTextToSize(t, L - 2 * M), M, y); y += 6; });
+
+  // Adresses inexistantes signalées par l'intervenant
+  const signalees = photos.filter((p) => p.signalement === 'adresse_inexistante').sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+  if (signalees.length) {
+    y += 4;
+    if (y > 230) { doc.addPage(); y = 20; }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(179, 90, 0);
+    doc.text(`Adresses inexistantes signalées : ${signalees.length} (photo de l'emplacement jointe, à vérifier par STATERA)`, M, y);
+    doc.setFont('helvetica', 'normal');
+    autoTable(doc, {
+      startY: y + 3, margin: { left: M, right: M },
+      head: [['Date', 'Réf.', 'Adresse', 'Commune', 'Constat de l\'intervenant']],
+      body: signalees.map((p) => [dateFR(p.dateISO).slice(0, 16), p.siteRef ?? '-', p.adresse, `${p.codePostal} ${p.ville}`, p.observation ?? '']),
+      styles: { font: 'helvetica', fontSize: 8, cellPadding: 1.8 },
+      headStyles: { fillColor: [255, 241, 222], textColor: [138, 75, 0], fontStyle: 'bold' },
+    });
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4;
+  }
 
   // Photos soumises à vérification du responsable
   const aVerifier = photos.filter((p) => !estValidee(p)).sort((a, b) => a.dateISO.localeCompare(b.dateISO));

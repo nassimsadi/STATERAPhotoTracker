@@ -11,6 +11,8 @@ export type PhotoRecord = {
   ecartM?: number | null;
   conformite?: 'conforme' | 'a_verifier';   // 'a_verifier' : non payée automatiquement, validation par le responsable
   motifVerification?: string;
+  signalement?: 'adresse_inexistante';   // l'intervenant signale que l'adresse n'existe pas (photo = preuve)
+  observation?: string;                 // constat de l'intervenant (ex. « la rue s'arrête au n° 10 »)
   adresse: string;        // adresse du site (modifiable)
   codePostal: string;
   ville: string;

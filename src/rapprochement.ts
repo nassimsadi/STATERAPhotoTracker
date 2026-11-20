@@ -4,11 +4,11 @@ import { statutFinal, type TourneeImportee } from './validationDb';
 import type { EtapePlan, PhotoRecord } from './types';
 
 export type PhotoRecue = PhotoRecord & { tourneeCle: string; intervenant: string; statut: ReturnType<typeof statutFinal>; commentaire?: string };
-export type StatutSite = 'realise' | 'en_attente' | 'a_reprendre' | 'non_realise';
+export type StatutSite = 'realise' | 'inexistante' | 'en_attente' | 'a_reprendre' | 'non_realise';
 export type LigneSite = { etape: EtapePlan; photos: PhotoRecue[]; validees: PhotoRecue[]; statut: StatutSite; datePassage: string | null };
 
 export const LIBELLE_STATUT: Record<StatutSite, string> = {
-  realise: 'Réalisé', en_attente: 'En cours de validation', a_reprendre: 'À reprendre', non_realise: 'Non réalisé',
+  realise: 'Réalisé', inexistante: 'Adresse inexistante', en_attente: 'En cours de validation', a_reprendre: 'À reprendre', non_realise: 'Non réalisé',
 };
 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -58,7 +58,9 @@ export function rapprocher(plan: EtapePlan[], photos: PhotoRecue[]) {
   const lignes: LigneSite[] = plan.map((e) => {
     const ps = parSite.get(e.id)!.sort((a, b) => a.dateISO.localeCompare(b.dateISO));
     const validees = ps.filter((p) => p.statut === 'validee' || p.statut === 'validee_auto');
-    const statut: StatutSite = validees.length ? 'realise'
+    // Signalement d'adresse inexistante validé par le responsable (et aucune photo « normale » validée)
+    const statut: StatutSite = validees.length && validees.every((p) => p.signalement) ? 'inexistante'
+      : validees.length ? 'realise'
       : ps.some((p) => p.statut === 'en_attente') ? 'en_attente'
       : ps.length ? 'a_reprendre' : 'non_realise';
     return { etape: e, photos: ps, validees, statut, datePassage: (validees[0] ?? ps[0])?.dateISO ?? null };
@@ -66,7 +68,7 @@ export function rapprocher(plan: EtapePlan[], photos: PhotoRecue[]) {
   const horsPlan = [...restantes].sort((a, b) => a.dateISO.localeCompare(b.dateISO));
   const n = (s: StatutSite) => lignes.filter((l) => l.statut === s).length;
   const synthese = {
-    prevus: lignes.length, realises: n('realise'), enAttente: n('en_attente'), aReprendre: n('a_reprendre'), nonRealises: n('non_realise'),
+    prevus: lignes.length, realises: n('realise'), inexistantes: n('inexistante'), enAttente: n('en_attente'), aReprendre: n('a_reprendre'), nonRealises: n('non_realise'),
     taux: lignes.length ? Math.round((n('realise') / lignes.length) * 100) : 0,
     photosValidees: lignes.reduce((t, l) => t + l.validees.length, 0),
     horsPlan: horsPlan.length,

@@ -12,7 +12,7 @@ import {
 } from './db';
 import type { EtapePlan, PhotoRecord, Rapport } from './types';
 
-type Ecran = { nom: 'accueil' } | { nom: 'capture'; etape: EtapePlan | null; cle: number } | { nom: 'fin' };
+type Ecran = { nom: 'accueil' } | { nom: 'capture'; etape: EtapePlan | null; cle: number; signalement?: boolean } | { nom: 'fin' };
 
 export default function App() {
   const [ecran, setEcran] = useState<Ecran>({ nom: 'accueil' });
@@ -65,10 +65,11 @@ export default function App() {
       ...photos.filter((p) => p.tourneeId === r.id).map((p) => supprimerBlob(p.id)),
     ]);
   };
-  const photographier = (etape: EtapePlan | null) => setEcran({ nom: 'capture', etape, cle: Date.now() });
+  const photographier = (etape: EtapePlan | null, signalement = false) => setEcran({ nom: 'capture', etape, cle: Date.now(), signalement });
+  const signaler = (etape: EtapePlan) => photographier(etape, true);
 
   if (ecran.nom === 'capture') {
-    return <Capture key={ecran.cle} etape={ecran.etape} onEnregistree={ajouter} onFermer={() => setEcran({ nom: 'accueil' })} />;
+    return <Capture key={ecran.cle} etape={ecran.etape} signalementInitial={ecran.signalement} onEnregistree={ajouter} onFermer={() => setEcran({ nom: 'accueil' })} />;
   }
   if (ecran.nom === 'fin') {
     return <FinTournee photosTournee={photosTournee} rapports={rapports} avancementPlan={av} onCloturer={cloturer}
@@ -99,9 +100,9 @@ export default function App() {
       <Installation />
       {!charge ? <main className="contenu"><p className="aide centre">Chargement…</p></main> : onglet === 'tournee'
         ? <TourneeJour plan={plan} photos={photos} onMajPlan={(p) => { setPlan(p); enregistrerPlan(p); }}
-            onPhotographier={photographier} onAllerAuPlan={() => setOnglet('plan')} />
+            onPhotographier={photographier} onSignaler={signaler} onAllerAuPlan={() => setOnglet('plan')} />
         : onglet === 'plan'
-        ? <Plan plan={plan} photos={photos} onImporter={(p) => { setPlan(p); enregistrerPlan(p); }} onPhotographier={photographier} />
+        ? <Plan plan={plan} photos={photos} onImporter={(p) => { setPlan(p); enregistrerPlan(p); }} onPhotographier={photographier} onSignaler={signaler} />
         : onglet === 'realisations'
         ? <Realisations rapports={rapports} photos={photos} onSupprimer={supprimerRealisation}
             onMajRapport={(r) => { const rs = rapports.map((x) => (x.id === r.id ? r : x)); setRapports(rs); enregistrerRapports(rs); }} />
