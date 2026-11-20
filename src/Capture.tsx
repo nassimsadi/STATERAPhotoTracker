@@ -33,7 +33,7 @@ export default function Capture({ etape, signalementInitial, onEnregistree, onFe
     if (!f) return;
     const maintenant = Date.now();
     // Date de prise : celle du fichier si elle est récente (Android), sinon l'heure actuelle.
-    const t = f.lastModified && maintenant - f.lastModified < 10 * 60_000 ? f.lastModified : maintenant;
+    const t = f.lastModified && maintenant - f.lastModified >= 0 && maintenant - f.lastModified < 10 * 60_000 ? f.lastModified : maintenant;
     setDateISO(new Date(t).toISOString());
     setPositionPhoto(position);
     setImage(await chargerImage(f));
