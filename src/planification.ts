@@ -33,7 +33,8 @@ export function joursFeries(a: number): Set<string> {
 
 /** Jours travaillés : samedi et dimanche au choix, jours fériés au choix. */
 export type JoursTravailles = { samedi: boolean; dimanche: boolean; feries: boolean };
-export const TOUS_LES_JOURS: JoursTravailles = { samedi: true, dimanche: true, feries: false };
+/** Planification en jours calendaires : tous les jours sont travaillés (week-ends et jours fériés compris). */
+export const TOUS_LES_JOURS: JoursTravailles = { samedi: true, dimanche: true, feries: true };
 
 export function estOuvre(jour: string, t: JoursTravailles): boolean {
   const j = depuisISO(jour).getDay();
@@ -77,4 +78,33 @@ export async function calculerDates(etapes: EtapePlan[], o: OptionsDates): Promi
     jour = prochainOuvre(ajouterJours(jour, 1), o.jours);
   }
   return { etapes: res, jours };
+}
+
+// ---------- Tournées : décaler, alimenter le jour suivant ----------
+
+/**
+ * Décale au lendemain la tournée d'un jour : ses sites restants (non photographiés) et ceux des jours suivants
+ * avancent tous d'un jour, pour qu'aucune journée ne soit surchargée.
+ */
+export function decalerTournee(plan: EtapePlan[], jour: string, faites: Set<string>): EtapePlan[] {
+  return plan.map((e) => (e.date && e.date >= jour && !faites.has(e.id) ? { ...e, date: ajouterJours(e.date, 1) } : e));
+}
+
+/**
+ * Prépare la tournée du lendemain : reporte les sites non faits du jour et des jours passés,
+ * puis complète jusqu'à `parJour` sites avec les sites suivants du plan. L'itinéraire est recalculé.
+ */
+export async function alimenterJourSuivant(plan: EtapePlan[], faites: Set<string>, parJour: number, aujourdhui: string) {
+  const cible = ajouterJours(aujourdhui, 1);
+  const restant = (e: EtapePlan) => !faites.has(e.id);
+  const reportes = plan.filter((e) => restant(e) && e.date && e.date < cible);
+  const prevus = plan.filter((e) => restant(e) && e.date === cible);
+  const manque = Math.max(0, Math.max(MIN_SITES_PAR_JOUR, parJour) - reportes.length - prevus.length);
+  const avances = plan.filter((e) => restant(e) && (!e.date || e.date > cible))
+    .sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || a.ordre - b.ordre)
+    .slice(0, manque);
+  const duJour = [...reportes, ...prevus, ...avances];
+  const { ordre } = await optimiser(duJour);
+  const nouveaux = new Map(ordre.map((e, i) => [e.id, { ...e, date: cible, ordre: i + 1, ordreAuto: true }]));
+  return { plan: plan.map((e) => nouveaux.get(e.id) ?? e), jour: cible, total: duJour.length, reportes: reportes.length, avances: avances.length };
 }

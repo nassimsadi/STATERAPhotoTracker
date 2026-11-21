@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ajouterJours, jourISO, libelleJour, lundi } from './plan';
 import { importerFichierPlan } from './importPlan';
 import { avancement } from './regroupement';
 import { localiserEtapes, optimiserParJour } from './itineraire';
-import { calculerDates, debutPropose, estDoublon, MIN_SITES_PAR_JOUR, TOUS_LES_JOURS, type JoursTravailles } from './planification';
+import { calculerDates, debutPropose, estDoublon, MIN_SITES_PAR_JOUR, TOUS_LES_JOURS } from './planification';
+import { ecrireParJour, lireParJour } from './db';
 import type { EtapePlan, PhotoRecord } from './types';
 
 type Props = {
@@ -36,7 +37,8 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
   const [mode, setMode] = useState<'ajouter' | 'remplacer'>('ajouter');
   const [autoDates, setAutoDates] = useState(true);
   const [parJour, setParJour] = useState(30);
-  const [jours, setJours] = useState<JoursTravailles>(TOUS_LES_JOURS);
+  useEffect(() => { lireParJour().then(setParJour); }, []);
+  const jours = TOUS_LES_JOURS;   // jours calendaires
   const [debut, setDebut] = useState(() => debutPropose(plan, TOUS_LES_JOURS));
 
   const importer = async (f?: File) => {
@@ -71,6 +73,7 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
       let joursCalcules: string[] = [];
       if (dates && localisees.some((e) => !e.date)) {
         setCalcul('Calcul des dates de passage…');
+        await ecrireParJour(Math.max(MIN_SITES_PAR_JOUR, parJour));
         const r = await calculerDates(localisees.filter((e) => !e.date), { debut, parJour, jours });
         localisees = [...localisees.filter((e) => e.date), ...r.etapes];
         joursCalcules = r.jours;
@@ -121,7 +124,7 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
         {sansDate > 0 && (
           <div className="dates-auto">
             <label className="case"><input type="checkbox" checked={autoDates} onChange={(e) => setAutoDates(e.target.checked)} />
-              <span><b>Calculer automatiquement les dates</b><small>{sansDate} site(s) sans date : regroupés par proximité et répartis jour par jour.</small></span></label>
+              <span><b>Calculer automatiquement les dates</b><small>{sansDate} site(s) sans date : regroupés par proximité et répartis jour par jour, en jours calendaires (week-ends et jours fériés compris).</small></span></label>
             {autoDates && (
               <div className="ligne-champs">
                 <label className="champ" style={{ flex: 1 }}><span>Sites par jour (min. {MIN_SITES_PAR_JOUR})</span>
@@ -130,13 +133,6 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
                     onBlur={() => setParJour((v) => Math.min(300, Math.max(MIN_SITES_PAR_JOUR, v)))} /></label>
                 <label className="champ" style={{ flex: 1.3 }}><span>À partir du</span>
                   <input type="date" value={debut} onChange={(e) => e.target.value && setDebut(e.target.value)} /></label>
-              </div>
-            )}
-            {autoDates && (
-              <div className="jours-travailles">
-                <label className="case"><input type="checkbox" checked={jours.samedi} onChange={(e) => setJours({ ...jours, samedi: e.target.checked })} /><span>Samedi travaillé</span></label>
-                <label className="case"><input type="checkbox" checked={jours.dimanche} onChange={(e) => setJours({ ...jours, dimanche: e.target.checked })} /><span>Dimanche travaillé</span></label>
-                <label className="case"><input type="checkbox" checked={jours.feries} onChange={(e) => setJours({ ...jours, feries: e.target.checked })} /><span>Jours fériés travaillés</span></label>
               </div>
             )}
             {autoDates && <p className="aide">≈ {nbJours} jour(s) de tournée à partir du {libelleJour(debut)}</p>}

@@ -11,6 +11,8 @@ export const chargerPlan = async () => (await get<EtapePlan[]>('plan', meta)) ??
 export const enregistrerPlan = (p: EtapePlan[]) => set('plan', p, meta);
 export const chargerRapports = async () => (await get<Rapport[]>('rapports', meta)) ?? [];
 export const enregistrerRapports = (r: Rapport[]) => set('rapports', r, meta);
+export const lireParJour = async () => (await get<number>('parJour', meta)) ?? 30;
+export const ecrireParJour = (n: number) => set('parJour', n, meta);
 export const lireIntervenant = async () => (await get<string>('intervenant', meta)) ?? '';
 export const ecrireIntervenant = (n: string) => set('intervenant', n, meta);
 

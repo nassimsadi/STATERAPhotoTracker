@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ecrireBlob, ecrireIntervenant, lireIntervenant } from './db';
+import { ecrireBlob, ecrireIntervenant, ecrireParJour, lireIntervenant, lireParJour } from './db';
 import { creerZip } from './exportZip';
 import { partagerFichier } from './partage';
 import { bilanTournee, chargerLogoPdf, construirePdf, euros } from './rapport';
 import { dateFR, horodatageFichier, nomSur } from './format';
-import type { PhotoRecord, Rapport } from './types';
+import type { EtapePlan, PhotoRecord, Rapport } from './types';
+import { alimenterJourSuivant, MIN_SITES_PAR_JOUR } from './planification';
+import { jourISO, libelleJour } from './plan';
 
 type Props = {
   photosTournee: PhotoRecord[];
@@ -13,9 +15,35 @@ type Props = {
   onCloturer: (r: Rapport) => Promise<void>;
   onRetour: () => void;
   onRealisations: () => void;
+  plan: EtapePlan[];
+  photos: PhotoRecord[];
+  onMajPlan: (p: EtapePlan[]) => void;
 };
 
-export default function FinTournee({ photosTournee, rapports, avancementPlan, onCloturer, onRetour, onRealisations }: Props) {
+export default function FinTournee({ photosTournee, rapports, avancementPlan, onCloturer, onRetour, onRealisations, plan, photos, onMajPlan }: Props) {
+  // « Alimenter le jour suivant » : prépare la tournée du lendemain après la clôture
+  const [parJour, setParJour] = useState(30);
+  useEffect(() => { lireParJour().then(setParJour); }, []);
+  const [alimente, setAlimente] = useState<string | null>(null);
+  const alimenter = async () => {
+    const n = Math.max(MIN_SITES_PAR_JOUR, parJour);
+    await ecrireParJour(n);
+    setOccupe('alimenter');
+    try {
+      const faites = new Set(photos.map((p) => p.etapeId).filter(Boolean) as string[]);
+      const r = await alimenterJourSuivant(plan, faites, n, jourISO(new Date()));
+      onMajPlan(r.plan);
+      setAlimente(r.total
+        ? `Tournée du ${libelleJour(r.jour)} prête : ${r.total} site(s)`
+          + (r.reportes ? `, dont ${r.reportes} reporté(s)` : '') + (r.avances ? `, ${r.avances} avancé(s) depuis la suite du plan` : '')
+          + '. Itinéraire optimisé.'
+        : 'Le plan de route ne contient plus de site à faire.');
+    } catch (e) {
+      setAlimente(`Impossible de préparer le jour suivant : ${String(e)}`);
+    } finally {
+      setOccupe(null);
+    }
+  };
   const [intervenant, setIntervenant] = useState('');
   useEffect(() => { lireIntervenant().then((v) => setIntervenant((actuel) => actuel || v)); }, []);
   const bilan = useMemo(() => bilanTournee(photosTournee, intervenant.trim()), [photosTournee, intervenant]);
@@ -92,6 +120,19 @@ export default function FinTournee({ photosTournee, rapports, avancementPlan, on
           <div className="alerte vert">Rapport généré : {pdf.r.nbSites} site(s), {pdf.r.nbPhotos} photo(s), {euros(pdf.r.montant)} validés{pdf.r.nbAVerifier ? `, ${pdf.r.nbAVerifier} photo(s) à vérifier` : ''}.</div>
           <Etape n={3} titre="Déposer le rapport PDF" detail="Choisissez votre outil de reporting dans le menu Partager : Drive, OneDrive, SharePoint, Mail…" />
           <button className="btn plein" onClick={() => partagerPdf(pdf.f)}>Partager / enregistrer le PDF</button>
+          <Etape n={4} titre="Alimenter le jour suivant" detail="Reporte les sites non faits et complète la tournée de demain avec la suite du plan." />
+          {plan.length > 0 && !alimente && (
+            <div className="ligne-champs" style={{ alignItems: 'flex-end' }}>
+              <label className="champ" style={{ flex: 1 }}><span>Sites par jour (min. {MIN_SITES_PAR_JOUR})</span>
+                <input type="number" min={MIN_SITES_PAR_JOUR} max={300} inputMode="numeric" value={parJour}
+                  onChange={(e) => setParJour(Number(e.target.value) || MIN_SITES_PAR_JOUR)}
+                  onBlur={() => setParJour((v) => Math.min(300, Math.max(MIN_SITES_PAR_JOUR, v)))} /></label>
+              <button className="btn plein" style={{ flex: 1.4 }} disabled={occupe === 'alimenter'} onClick={alimenter}>
+                {occupe === 'alimenter' ? 'Préparation…' : '📅 Alimenter le jour suivant'}</button>
+            </div>
+          )}
+          {!plan.length && <p className="aide">Aucun plan de route : importez-en un pour préparer la tournée suivante.</p>}
+          {alimente && <div className="alerte vert">{alimente}</div>}
           <button className="btn contour" onClick={onRealisations}>Voir dans « Réalisations »</button>
           <button className="btn texte" onClick={onRetour}>Terminer</button>
         </main>

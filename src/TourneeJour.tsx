@@ -3,7 +3,8 @@ import Carte from './Carte';
 import { inverserParcours, optimiserDepuisPosition } from './actionsTournee';
 import { lienNavigation } from './itineraire';
 import { jourParDefaut, lienItineraire } from './Plan';
-import { jourISO, libelleJour } from './plan';
+import { ajouterJours, jourISO, libelleJour } from './plan';
+import { decalerTournee } from './planification';
 import { avancement } from './regroupement';
 import type { EtapePlan, PhotoRecord } from './types';
 
@@ -62,6 +63,19 @@ export default function TourneeJour({ plan, photos, onMajPlan, onPhotographier, 
       setCalcul(null);
     }
   };
+  /** Décale la tournée du jour au lendemain (et les suivantes d'un jour). */
+  const decaler = () => {
+    const faites = new Set(photos.map((p) => p.etapeId).filter(Boolean) as string[]);
+    const nb = restantes.filter((e) => e.date).length;
+    if (!nb) return setInfo({ txt: 'Aucun site daté à décaler pour ce jour.', cls: 'orange' });
+    const demain = ajouterJours(jour, 1);
+    if (!confirm(`Décaler la tournée du ${libelleJour(jour)} (${nb} site(s) restant(s)) au ${libelleJour(demain)} ?\n\n`
+      + 'Les tournées suivantes sont aussi décalées d\'un jour.')) return;
+    onMajPlan(decalerTournee(plan, jour, faites));
+    setJour(demain);
+    setInfo({ txt: `Tournée décalée au ${libelleJour(demain)} : ${nb} site(s). Les tournées suivantes ont été décalées d'un jour.`, cls: 'vert' });
+  };
+
   const inverser = () => {
     const r = inverserParcours(plan, etapes, nb);
     if (r) { onMajPlan(r.plan); setInfo({ txt: r.message, cls: 'vert' }); }
@@ -103,6 +117,9 @@ export default function TourneeJour({ plan, photos, onMajPlan, onPhotographier, 
             <a className="btn contour" href={lienNavigation(restantes.slice(0, 10))} target="_blank" rel="noreferrer">
               ▶ Navigation : {restantes.length > 10 ? `10 prochaines étapes (sur ${restantes.length} restantes)` : `${restantes.length} étape(s) restante(s)`}
             </a>
+          )}
+          {restantes.some((e) => e.date) && (
+            <button className="btn contour" onClick={decaler}>⏭ Décaler la tournée au lendemain</button>
           )}
 
           {prochaine ? (

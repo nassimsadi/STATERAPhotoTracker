@@ -6,6 +6,7 @@ import Realisations from './Realisations';
 import Photos from './Photos';
 import FinTournee from './FinTournee';
 import Installation from './Installation';
+import InviteGoogleMaps from './GoogleMaps';
 import { avancement } from './regroupement';
 import {
   chargerPhotos, chargerPlan, chargerRapports, demanderPersistance, enregistrerPhotos, enregistrerPlan, enregistrerRapports, supprimerBlob,
@@ -74,7 +75,8 @@ export default function App() {
   if (ecran.nom === 'fin') {
     return <FinTournee photosTournee={photosTournee} rapports={rapports} avancementPlan={av} onCloturer={cloturer}
       onRetour={() => { setEcran({ nom: 'accueil' }); setOnglet('plan'); }}
-      onRealisations={() => { setEcran({ nom: 'accueil' }); setOnglet('realisations'); }} />;
+      onRealisations={() => { setEcran({ nom: 'accueil' }); setOnglet('realisations'); }}
+      plan={plan} photos={photos} onMajPlan={(p) => { setPlan(p); enregistrerPlan(p); }} />;
   }
 
   return (
@@ -98,6 +100,7 @@ export default function App() {
         </nav>
       </header>
       <Installation />
+      <InviteGoogleMaps />
       {!charge ? <main className="contenu"><p className="aide centre">Chargement…</p></main> : onglet === 'tournee'
         ? <TourneeJour plan={plan} photos={photos} onMajPlan={(p) => { setPlan(p); enregistrerPlan(p); }}
             onPhotographier={photographier} onSignaler={signaler} onAllerAuPlan={() => setOnglet('plan')} />

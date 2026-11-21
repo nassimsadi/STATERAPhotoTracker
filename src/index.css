@@ -288,3 +288,7 @@ h1, h2, h3, h4 { margin: 0; }
 .panneau-import .case small { color: var(--gris); font-size: 13px; }
 .case input[type=radio] { width: 20px; height: 20px; accent-color: var(--sarcelle); flex: none; margin-top: 1px; }
 .jours-travailles { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+
+.gmaps { margin: 12px 16px 0; max-width: 608px; align-self: center; width: calc(100% - 32px); background: #EAF2F0; border: 1px solid #CFE2DD;
+  border-radius: 14px; padding: 12px 14px; font-size: 14px; display: flex; flex-direction: column; gap: 8px; }
+.gmaps p { margin: 0; line-height: 1.45; }
