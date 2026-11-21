@@ -280,3 +280,10 @@ h1, h2, h3, h4 { margin: 0; }
 .liste-jour li.inexistante { background: #FFF8EE; border-color: #F1C38B; }
 .signalement-alerte { background: #FFF1DE; color: #8A4B00; }
 .signalement-alerte small { font-weight: 600; }
+
+/* Import : plan complémentaire */
+.panneau-import { border: 2px solid var(--sarcelle); gap: 10px; }
+.panneau-import .choix, .panneau-import .dates-auto { display: flex; flex-direction: column; gap: 8px; background: var(--sarcelle-fond); border-radius: 12px; padding: 10px 12px; }
+.panneau-import .case span { display: flex; flex-direction: column; gap: 2px; }
+.panneau-import .case small { color: var(--gris); font-size: 13px; }
+.case input[type=radio] { width: 20px; height: 20px; accent-color: var(--sarcelle); flex: none; margin-top: 1px; }

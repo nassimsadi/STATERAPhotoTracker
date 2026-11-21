@@ -3,6 +3,7 @@ import { ajouterJours, jourISO, libelleJour, lundi } from './plan';
 import { importerFichierPlan } from './importPlan';
 import { avancement } from './regroupement';
 import { localiserEtapes, optimiserParJour } from './itineraire';
+import { calculerDates, debutPropose, estDoublon } from './planification';
 import type { EtapePlan, PhotoRecord } from './types';
 
 type Props = {
@@ -30,32 +31,66 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
     return m;
   }, [photos]);
 
+  // Import en attente de choix : remplacer ou compléter le plan, dates automatiques
+  const [attente, setAttente] = useState<{ etapes: EtapePlan[]; nomFichier: string } | null>(null);
+  const [mode, setMode] = useState<'ajouter' | 'remplacer'>('ajouter');
+  const [autoDates, setAutoDates] = useState(true);
+  const [parJour, setParJour] = useState(30);
+  const [samedi, setSamedi] = useState(false);
+  const [debut, setDebut] = useState(() => debutPropose(plan, false));
+
   const importer = async (f?: File) => {
     if (!f) return;
     try {
       const etapes = await importerFichierPlan(f);
       if (!etapes.length) throw new Error('Aucune étape trouvée dans le fichier.');
-      if (plan.length && !confirm(`Remplacer le plan actuel (${plan.length} étapes) par ce fichier (${etapes.length} étapes) ?`)) return;
-      onImporter(etapes);
-      setJour(jourParDefaut(etapes, aujourdhui));
-      setVue(etapes.some((e) => e.date) ? 'jour' : 'tout');
-      const dates = etapes.map((e) => e.date).filter(Boolean).sort();
-      const sansDate = etapes.length - dates.length;
-      const resume = `Plan importé : ${etapes.length} étape(s)`
-        + (dates.length ? (dates[0] === dates[dates.length - 1] ? `, le ${libelleJour(dates[0])}` : `, du ${libelleJour(dates[0])} au ${libelleJour(dates[dates.length - 1])}`) : '')
-        + (sansDate ? ` · ${sansDate} sans date (affichées chaque jour)` : '');
-      setInfo({ txt: resume, cls: 'vert' });
-      // Localisation des adresses, puis ordre de passage optimal pour chaque journée sans « Ordre » fourni.
+      setInfo(null);
+      // Premier plan, entièrement daté : import direct
+      if (!plan.length && etapes.every((e) => e.date)) return appliquerImport(etapes, 'remplacer', false);
+      setMode(plan.length ? 'ajouter' : 'remplacer');
+      setAutoDates(true);
+      setDebut(debutPropose(plan.length ? plan : [], samedi));
+      setAttente({ etapes, nomFichier: f.name });
+    } catch (e) {
+      setCalcul(null);
+      setInfo({ txt: e instanceof Error ? e.message : String(e), cls: 'rouge' });
+    }
+  };
+
+  /** Applique l'import : remplace ou complète le plan, calcule les dates manquantes, localise et optimise. */
+  const appliquerImport = async (fichier: EtapePlan[], m: 'ajouter' | 'remplacer', dates: boolean) => {
+    setAttente(null);
+    try {
+      const base = m === 'ajouter' ? plan : [];
+      const doublons = m === 'ajouter' ? fichier.filter((e) => estDoublon(e, plan)) : [];
+      // Doublons internes au fichier aussi écartés
+      const nouveaux: EtapePlan[] = [];
+      for (const e of fichier) if (!doublons.includes(e) && !estDoublon(e, nouveaux)) nouveaux.push(e);
       setCalcul('Localisation des adresses…');
-      const localisees = await localiserEtapes(etapes, (f, t) => setCalcul(`Localisation des adresses : ${f}/${t}…`));
+      let localisees = await localiserEtapes(nouveaux, (f, t) => setCalcul(`Localisation des adresses : ${f}/${t}…`));
+      let joursCalcules: string[] = [];
+      if (dates && localisees.some((e) => !e.date)) {
+        setCalcul('Calcul des dates de passage…');
+        const r = await calculerDates(localisees.filter((e) => !e.date), { debut, parJour, samedi });
+        localisees = [...localisees.filter((e) => e.date), ...r.etapes];
+        joursCalcules = r.jours;
+      }
       setCalcul('Calcul des itinéraires par la route…');
-      const { plan: optimise, source } = await optimiserParJour(localisees);
+      const { plan: optimise, source } = await optimiserParJour([...base, ...localisees]);
       onImporter(optimise);
       setCalcul(null);
-      const nonLoc = optimise.filter((e) => e.nonLocalisee).length;
-      const auto = optimise.some((e) => e.ordreAuto);
+      setJour(jourParDefaut(optimise, aujourdhui));
+      setVue(optimise.some((e) => e.date) ? 'jour' : 'tout');
+      const nonLoc = localisees.filter((e) => e.nonLocalisee).length;
+      const sansDate = localisees.filter((e) => !e.date).length;
+      const dts = localisees.map((e) => e.date).filter(Boolean).sort();
       setInfo({
-        txt: resume + (auto ? (source === 'vol d\'oiseau' ? ' · ordre approximatif (calcul routier indisponible, relancez 🧭 avec du réseau)' : ' · ordre de passage optimisé par la route') : '')
+        txt: (m === 'ajouter' ? `Plan complété : ${localisees.length} site(s) ajouté(s)` : `Plan importé : ${localisees.length} site(s)`)
+          + (doublons.length ? `, ${doublons.length} déjà présent(s) ignoré(s)` : '')
+          + (dts.length ? (dts[0] === dts[dts.length - 1] ? `, le ${libelleJour(dts[0])}` : `, du ${libelleJour(dts[0])} au ${libelleJour(dts[dts.length - 1])}`) : '')
+          + (joursCalcules.length ? ` · dates calculées sur ${joursCalcules.length} jour(s) ouvré(s)` : '')
+          + (sansDate ? ` · ${sansDate} sans date (affichées chaque jour)` : '')
+          + (source === 'vol d\'oiseau' ? ' · ordre approximatif (calcul routier indisponible)' : ' · ordre de passage optimisé par la route')
           + (nonLoc ? ` · ${nonLoc} adresse(s) introuvable(s), à vérifier` : ''),
         cls: nonLoc ? 'orange' : 'vert',
       });
@@ -64,6 +99,51 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
       setInfo({ txt: e instanceof Error ? e.message : String(e), cls: 'rouge' });
     }
   };
+
+  const panneauImport = attente && (() => {
+    const fichier = attente.etapes;
+    const doublons = mode === 'ajouter' ? fichier.filter((e) => estDoublon(e, plan)).length : 0;
+    const aAjouter = fichier.length - doublons;
+    const sansDate = (mode === 'ajouter' ? fichier.filter((e) => !estDoublon(e, plan)) : fichier).filter((e) => !e.date).length;
+    const nbJours = Math.ceil(sansDate / Math.max(1, parJour));
+    return (
+      <div className="carte panneau-import">
+        <h3>Importer « {attente.nomFichier} »</h3>
+        <p className="aide">{fichier.length} site(s) dans le fichier{plan.length ? ` · plan actuel : ${plan.length} site(s)` : ''}.</p>
+        {plan.length > 0 && (
+          <div className="choix">
+            <label className="case"><input type="radio" checked={mode === 'ajouter'} onChange={() => setMode('ajouter')} />
+              <span><b>Ajouter au plan (plan complémentaire)</b><small>{aAjouter} nouveau(x) site(s){doublons ? `, ${doublons} déjà présent(s) ignoré(s)` : ''}. Les photos déjà prises restent associées.</small></span></label>
+            <label className="case"><input type="radio" checked={mode === 'remplacer'} onChange={() => setMode('remplacer')} />
+              <span><b>Remplacer le plan</b><small>Le plan actuel est effacé (les photos déjà prises sont conservées).</small></span></label>
+          </div>
+        )}
+        {sansDate > 0 && (
+          <div className="dates-auto">
+            <label className="case"><input type="checkbox" checked={autoDates} onChange={(e) => setAutoDates(e.target.checked)} />
+              <span><b>Calculer automatiquement les dates</b><small>{sansDate} site(s) sans date : regroupés par proximité et répartis sur les jours ouvrés (week-ends et jours fériés exclus).</small></span></label>
+            {autoDates && (
+              <div className="ligne-champs">
+                <label className="champ" style={{ flex: 1 }}><span>Sites par jour</span>
+                  <input type="number" min={1} max={200} inputMode="numeric" value={parJour} onChange={(e) => setParJour(Math.max(1, Number(e.target.value) || 1))} /></label>
+                <label className="champ" style={{ flex: 1.3 }}><span>À partir du</span>
+                  <input type="date" value={debut} onChange={(e) => e.target.value && setDebut(e.target.value)} /></label>
+              </div>
+            )}
+            {autoDates && (
+              <label className="case"><input type="checkbox" checked={samedi} onChange={(e) => setSamedi(e.target.checked)} /><span>Inclure le samedi</span></label>
+            )}
+            {autoDates && <p className="aide">≈ {nbJours} jour(s) de tournée à partir du {libelleJour(debut)}.</p>}
+          </div>
+        )}
+        <div className="actions">
+          <button className="btn contour petit" onClick={() => setAttente(null)}>Annuler</button>
+          <button className="btn plein petit" onClick={() => appliquerImport(fichier, mode, autoDates)}>
+            {mode === 'ajouter' ? 'Ajouter au plan' : 'Importer'}</button>
+        </div>
+      </div>
+    );
+  })();
 
   const debutSemaine = lundi(jour);
   const finSemaine = ajouterJours(debutSemaine, 6);
@@ -99,6 +179,7 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
             <b> Date, Site, Adresse, Code postal, Ville, Consigne</b> (et facultativement Ordre, Latitude, Longitude).
             Seules Adresse, Code postal et Ville sont obligatoires. Sans colonne Ordre, l'appli calcule l'itinéraire optimal.
           </p>
+          {panneauImport}
           {info && <div className={`alerte ${info.cls}`}>{info.txt}</div>}
           {calcul && <div className="alerte gris">{calcul}</div>}
           <button className="btn plein" onClick={() => fichier.current?.click()}>Importer le plan de route (Excel)</button>
@@ -112,6 +193,8 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
   return (
     <main className="contenu">
       {entreeFichier}
+      {panneauImport}
+      {calcul && !attente && <div className="alerte gris">{calcul}</div>}
       <div className="carte">
         <h3>Avancement du plan de route</h3>
         <Barre libelle={vue === 'jour' ? 'Ce jour' : 'Jour sélectionné'} st={avancement(duJour, photos)} />
@@ -138,7 +221,6 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
         </div>
       )}
 
-      {calcul && <div className="alerte gris">{calcul}</div>}
       {info && <div className={`alerte ${info.cls}`}>{info.txt}</div>}
       {visibles.length === 0 && (
         <div className="carte">
@@ -183,7 +265,7 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
         </section>
       ))}
 
-      <button className="btn contour" onClick={() => fichier.current?.click()}>Importer un nouveau plan (Excel)</button>
+      <button className="btn contour" onClick={() => fichier.current?.click()}>Importer un plan (complémentaire ou nouveau)</button>
       <button className="btn texte-rouge" onClick={() => {
         if (confirm(`Supprimer tout le plan de route (${plan.length} étapes) ?\n\nLes photos déjà prises sont conservées dans la tournée.`)) {
           onImporter([]);
