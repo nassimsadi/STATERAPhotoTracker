@@ -3,7 +3,8 @@ import { ajouterJours, jourISO, libelleJour, lundi } from './plan';
 import { importerFichierPlan } from './importPlan';
 import { avancement } from './regroupement';
 import { localiserEtapes, optimiserParJour } from './itineraire';
-import { calculerDates, debutPropose, estDoublon, MIN_SITES_PAR_JOUR, TOUS_LES_JOURS } from './planification';
+import VueGlobale from './VueGlobale';
+import { calculerDates, debutPropose, estDoublon, MIN_SITES_PAR_JOUR, MAX_SITES_PAR_JOUR, TOUS_LES_JOURS } from './planification';
 import { ecrireParJour, lireParJour } from './db';
 import type { EtapePlan, PhotoRecord } from './types';
 
@@ -14,7 +15,7 @@ type Props = {
   onPhotographier: (e: EtapePlan) => void;
   onSignaler: (e: EtapePlan) => void;
 };
-type Vue = 'jour' | 'semaine' | 'tout';
+type Vue = 'jour' | 'semaine' | 'tout' | 'global';
 
 export default function Plan({ plan, photos, onImporter, onPhotographier, onSignaler }: Props) {
   const aujourdhui = jourISO(new Date());
@@ -73,7 +74,7 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
       let joursCalcules: string[] = [];
       if (dates && localisees.some((e) => !e.date)) {
         setCalcul('Calcul des dates de passage…');
-        await ecrireParJour(Math.max(MIN_SITES_PAR_JOUR, parJour));
+        await ecrireParJour(Math.min(MAX_SITES_PAR_JOUR, Math.max(MIN_SITES_PAR_JOUR, parJour)));
         const r = await calculerDates(localisees.filter((e) => !e.date), { debut, parJour, jours });
         localisees = [...localisees.filter((e) => e.date), ...r.etapes];
         joursCalcules = r.jours;
@@ -108,7 +109,7 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
     const doublons = mode === 'ajouter' ? fichier.filter((e) => estDoublon(e, plan)).length : 0;
     const aAjouter = fichier.length - doublons;
     const sansDate = (mode === 'ajouter' ? fichier.filter((e) => !estDoublon(e, plan)) : fichier).filter((e) => !e.date).length;
-    const nbJours = Math.ceil(sansDate / Math.max(MIN_SITES_PAR_JOUR, parJour));
+    const nbJours = Math.ceil(sansDate / Math.min(MAX_SITES_PAR_JOUR, Math.max(MIN_SITES_PAR_JOUR, parJour)));
     return (
       <div className="carte panneau-import">
         <h3>Importer « {attente.nomFichier} »</h3>
@@ -128,9 +129,9 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
             {autoDates && (
               <div className="ligne-champs">
                 <label className="champ" style={{ flex: 1 }}><span>Sites par jour (min. {MIN_SITES_PAR_JOUR})</span>
-                  <input type="number" min={MIN_SITES_PAR_JOUR} max={300} inputMode="numeric" value={parJour}
+                  <input type="number" min={MIN_SITES_PAR_JOUR} max={MAX_SITES_PAR_JOUR} inputMode="numeric" value={parJour}
                     onChange={(e) => setParJour(Number(e.target.value) || MIN_SITES_PAR_JOUR)}
-                    onBlur={() => setParJour((v) => Math.min(300, Math.max(MIN_SITES_PAR_JOUR, v)))} /></label>
+                    onBlur={() => setParJour((v) => Math.min(MAX_SITES_PAR_JOUR, Math.max(MIN_SITES_PAR_JOUR, v)))} /></label>
                 <label className="champ" style={{ flex: 1.3 }}><span>À partir du</span>
                   <input type="date" value={debut} onChange={(e) => e.target.value && setDebut(e.target.value)} /></label>
               </div>
@@ -205,14 +206,19 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
       </div>
 
       <div className="segment">
-        {(['jour', 'semaine', 'tout'] as Vue[]).map((v) => (
+        {(['jour', 'semaine', 'tout', 'global'] as Vue[]).map((v) => (
           <button key={v} className={vue === v ? 'actif' : ''} onClick={() => setVue(v)}>
-            {v === 'jour' ? 'Jour' : v === 'semaine' ? 'Semaine' : 'Tout'}
+            {v === 'jour' ? 'Jour' : v === 'semaine' ? 'Semaine' : v === 'tout' ? 'Tout' : 'Global'}
           </button>
         ))}
       </div>
 
-      {vue !== 'tout' && (
+      {vue === 'global' && (
+        <VueGlobale plan={plan} photos={photos} onPhotographier={onPhotographier} lienItineraire={lienItineraire}
+          onVoirJour={(d) => { setJour(d); setVue('jour'); }} />
+      )}
+
+      {(vue === 'jour' || vue === 'semaine') && (
         <div className="nav-date">
           <button className="rond" onClick={() => decaler(-1)} aria-label="Précédent">‹</button>
           <button className="titre-date" onClick={() => setJour(aujourdhui)}>
@@ -224,7 +230,7 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
       )}
 
       {info && <div className={`alerte ${info.cls}`}>{info.txt}</div>}
-      {visibles.length === 0 && (
+      {vue !== 'global' && visibles.length === 0 && (
         <div className="carte">
           <p className="aide centre">Aucune étape prévue {vue === 'semaine' ? 'cette semaine' : 'ce jour'}.</p>
           {suivante && <button className="btn plein petit" onClick={() => setJour(suivante)}>Étapes suivantes : {libelleJour(suivante)} ›</button>}
@@ -233,7 +239,7 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
         </div>
       )}
 
-      {groupes.map(([date, etapes]) => (
+      {vue !== 'global' && groupes.map(([date, etapes]) => (
         <section key={date || 'sans'}>
           {(vue !== 'jour' || !date) && (
             <h4 className="titre-jour">{date ? libelleJour(date) : 'Sans date'} · {avancement(etapes, photos).pct} %</h4>

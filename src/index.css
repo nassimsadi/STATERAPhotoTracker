@@ -292,3 +292,21 @@ h1, h2, h3, h4 { margin: 0; }
 .gmaps { margin: 12px 16px 0; max-width: 608px; align-self: center; width: calc(100% - 32px); background: #EAF2F0; border: 1px solid #CFE2DD;
   border-radius: 14px; padding: 12px 14px; font-size: 14px; display: flex; flex-direction: column; gap: 8px; }
 .gmaps p { margin: 0; line-height: 1.45; }
+
+.non-faits ul { margin: 6px 0 0; padding-left: 18px; font-weight: 500; }
+.retard { display: flex; flex-direction: column; gap: 8px; }
+
+/* Vue globale */
+.kpis-global { gap: 8px; }
+.kpis-global .kpi { padding: 12px 10px; }
+.kpis-global .kpi b { font-size: 26px; }
+.kpis-global .kpi span { font-size: 13px; }
+.calendrier li { padding: 0; }
+.jour-ligne { width: 100%; display: grid; grid-template-columns: 1fr 34% 64px; align-items: center; gap: 10px; background: none; border: 0; padding: 10px 12px; font: inherit; text-align: left; color: inherit; }
+.jour-nom { font-weight: 700; font-size: 14px; }
+.jour-nom::first-letter { text-transform: uppercase; }
+.jour-barre { height: 10px; background: #EEF2F1; border-radius: 5px; overflow: hidden; display: block; }
+.jour-barre > span { display: block; height: 100%; background: #CFE2DD; border-radius: 5px; overflow: hidden; }
+.jour-barre i { display: block; height: 100%; background: #3BB273; }
+.jour-chiffres { font-size: 13px; font-weight: 700; color: var(--sarcelle); text-align: right; white-space: nowrap; }
+.liste-jour li.en-retard { border-color: #F1C66B; background: #FFF9EC; }

@@ -5,8 +5,8 @@ import { partagerFichier } from './partage';
 import { bilanTournee, chargerLogoPdf, construirePdf, euros } from './rapport';
 import { dateFR, horodatageFichier, nomSur } from './format';
 import type { EtapePlan, PhotoRecord, Rapport } from './types';
-import { alimenterJourSuivant, MIN_SITES_PAR_JOUR } from './planification';
-import { jourISO, libelleJour } from './plan';
+import { alimenterJourSuivant, MIN_SITES_PAR_JOUR, MAX_SITES_PAR_JOUR, reporterSites, sitesEnRetard } from './planification';
+import { ajouterJours, jourISO, libelleJour } from './plan';
 
 type Props = {
   photosTournee: PhotoRecord[];
@@ -26,7 +26,7 @@ export default function FinTournee({ photosTournee, rapports, avancementPlan, on
   useEffect(() => { lireParJour().then(setParJour); }, []);
   const [alimente, setAlimente] = useState<string | null>(null);
   const alimenter = async () => {
-    const n = Math.max(MIN_SITES_PAR_JOUR, parJour);
+    const n = Math.min(MAX_SITES_PAR_JOUR, Math.max(MIN_SITES_PAR_JOUR, parJour));
     await ecrireParJour(n);
     setOccupe('alimenter');
     try {
@@ -55,6 +55,12 @@ export default function FinTournee({ photosTournee, rapports, avancementPlan, on
   const [occupe, setOccupe] = useState<string | null>(null);
   const [message, setMessage] = useState<{ txt: string; cls: string } | null>(null);
   const vide = photosTournee.length === 0;
+  // Sites de la tournée du jour (et des jours passés) non faits : ils seront reportés au lendemain à la clôture
+  const faitesAvant = new Set(photos.map((p) => p.etapeId).filter(Boolean) as string[]);
+  const aujourdhui = jourISO(new Date());
+  const demain = ajouterJours(aujourdhui, 1);
+  const nonFaits = sitesEnRetard(plan, faitesAvant, demain).sort((a, b) => a.date.localeCompare(b.date) || a.ordre - b.ordre);
+  const [reportes, setReportes] = useState<string | null>(null);
 
   const verifierNom = () => {
     if (intervenant.trim()) return true;
@@ -100,6 +106,12 @@ export default function FinTournee({ photosTournee, rapports, avancementPlan, on
       await ecrireBlob(`zip:${r.id}`, zip);     // conservé pour l'onglet Réalisations
       r.zipCle = `zip:${r.id}`;
       await onCloturer(r);       // les photos de la tournée sont marquées comme clôturées
+      // Report automatique des sites non faits au lendemain
+      if (nonFaits.length) {
+        const rep = await reporterSites(plan, faitesAvant, demain, demain);
+        onMajPlan(rep.plan);
+        setReportes(`${rep.nb} site(s) non fait(s) reporté(s) au ${libelleJour(demain)}, en tête de tournée.`);
+      }
       setPdf({ f, r });
     } catch (e) {
       setMessage({ txt: `Rapport impossible : ${String(e)}`, cls: 'rouge' });
@@ -117,6 +129,7 @@ export default function FinTournee({ photosTournee, rapports, avancementPlan, on
       <div className="ecran">
         <header className="barre-haut"><button className="lien" onClick={onRetour}>‹ Accueil</button><h1>Tournée clôturée</h1><span style={{ width: 70 }} /></header>
         <main className="contenu">
+          {reportes && <div className="alerte orange">↪ {reportes}</div>}
           <div className="alerte vert">Rapport généré : {pdf.r.nbSites} site(s), {pdf.r.nbPhotos} photo(s), {euros(pdf.r.montant)} validés{pdf.r.nbAVerifier ? `, ${pdf.r.nbAVerifier} photo(s) à vérifier` : ''}.</div>
           <Etape n={3} titre="Déposer le rapport PDF" detail="Choisissez votre outil de reporting dans le menu Partager : Drive, OneDrive, SharePoint, Mail…" />
           <button className="btn plein" onClick={() => partagerPdf(pdf.f)}>Partager / enregistrer le PDF</button>
@@ -124,9 +137,9 @@ export default function FinTournee({ photosTournee, rapports, avancementPlan, on
           {plan.length > 0 && !alimente && (
             <div className="ligne-champs" style={{ alignItems: 'flex-end' }}>
               <label className="champ" style={{ flex: 1 }}><span>Sites par jour (min. {MIN_SITES_PAR_JOUR})</span>
-                <input type="number" min={MIN_SITES_PAR_JOUR} max={300} inputMode="numeric" value={parJour}
+                <input type="number" min={MIN_SITES_PAR_JOUR} max={MAX_SITES_PAR_JOUR} inputMode="numeric" value={parJour}
                   onChange={(e) => setParJour(Number(e.target.value) || MIN_SITES_PAR_JOUR)}
-                  onBlur={() => setParJour((v) => Math.min(300, Math.max(MIN_SITES_PAR_JOUR, v)))} /></label>
+                  onBlur={() => setParJour((v) => Math.min(MAX_SITES_PAR_JOUR, Math.max(MIN_SITES_PAR_JOUR, v)))} /></label>
               <button className="btn plein" style={{ flex: 1.4 }} disabled={occupe === 'alimenter'} onClick={alimenter}>
                 {occupe === 'alimenter' ? 'Préparation…' : '📅 Alimenter le jour suivant'}</button>
             </div>
@@ -161,6 +174,15 @@ export default function FinTournee({ photosTournee, rapports, avancementPlan, on
         {!vide && <p className="aide">Du {dateFR(bilan.debutISO)} au {dateFR(bilan.finISO)}</p>}
         {message && <div className={`alerte ${message.cls}`}>{message.txt}</div>}
 
+        {nonFaits.length > 0 && (
+          <div className="alerte orange non-faits">
+            ⚠️ {nonFaits.length} site(s) de la tournée ne sont pas faits : ils seront <b>reportés au {libelleJour(demain)}</b> à la clôture.
+            <ul>
+              {nonFaits.slice(0, 5).map((e) => <li key={e.id}>{e.nom ? `${e.nom} – ` : ''}{e.adresse}, {e.ville}</li>)}
+              {nonFaits.length > 5 && <li>… et {nonFaits.length - 5} autre(s)</li>}
+            </ul>
+          </div>
+        )}
         <Etape n={1} fait={zipEnvoye} titre="Envoyer les photos (.zip)" detail="Classées par département puis par ville, avec un récapitulatif Excel." />
         {!zip ? (
           <button className="btn plein" disabled={vide || !!occupe} onClick={preparerZip}>{occupe === 'zip' ? 'Préparation du .zip…' : 'Préparer le .zip'}</button>

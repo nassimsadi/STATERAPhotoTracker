@@ -58,6 +58,8 @@ export function debutPropose(plan: EtapePlan[], t: JoursTravailles): string {
 }
 
 export const MIN_SITES_PAR_JOUR = 30;
+export const MAX_SITES_PAR_JOUR = 500;   // garde-fou contre une erreur de saisie
+const borner = (n: number) => Math.min(MAX_SITES_PAR_JOUR, Math.max(MIN_SITES_PAR_JOUR, Math.floor(n) || MIN_SITES_PAR_JOUR));
 export type OptionsDates = { debut: string; parJour: number; jours: JoursTravailles };
 
 /**
@@ -68,7 +70,7 @@ export type OptionsDates = { debut: string; parJour: number; jours: JoursTravail
 export async function calculerDates(etapes: EtapePlan[], o: OptionsDates): Promise<{ etapes: EtapePlan[]; jours: string[] }> {
   if (!etapes.length) return { etapes, jours: [] };
   const { ordre } = await optimiser(etapes);
-  const parJour = Math.max(MIN_SITES_PAR_JOUR, Math.floor(o.parJour));
+  const parJour = borner(o.parJour);
   const res: EtapePlan[] = [];
   const jours: string[] = [];
   let jour = prochainOuvre(o.debut, o.jours);
@@ -99,7 +101,7 @@ export async function alimenterJourSuivant(plan: EtapePlan[], faites: Set<string
   const restant = (e: EtapePlan) => !faites.has(e.id);
   const reportes = plan.filter((e) => restant(e) && e.date && e.date < cible);
   const prevus = plan.filter((e) => restant(e) && e.date === cible);
-  const manque = Math.max(0, Math.max(MIN_SITES_PAR_JOUR, parJour) - reportes.length - prevus.length);
+  const manque = Math.max(0, borner(parJour) - reportes.length - prevus.length);
   const avances = plan.filter((e) => restant(e) && (!e.date || e.date > cible))
     .sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || a.ordre - b.ordre)
     .slice(0, manque);
@@ -107,4 +109,23 @@ export async function alimenterJourSuivant(plan: EtapePlan[], faites: Set<string
   const { ordre } = await optimiser(duJour);
   const nouveaux = new Map(ordre.map((e, i) => [e.id, { ...e, date: cible, ordre: i + 1, ordreAuto: true }]));
   return { plan: plan.map((e) => nouveaux.get(e.id) ?? e), jour: cible, total: duJour.length, reportes: reportes.length, avances: avances.length };
+}
+
+/** Sites non faits (sans photo ni signalement) datés avant `avant`. */
+export const sitesEnRetard = (plan: EtapePlan[], faites: Set<string>, avant: string) =>
+  plan.filter((e) => e.date && e.date < avant && !faites.has(e.id));
+
+/**
+ * Reporte vers `vers` les sites non faits datés avant `avant`, placés en tête de cette journée,
+ * puis recalcule l'itinéraire de la journée.
+ */
+export async function reporterSites(plan: EtapePlan[], faites: Set<string>, avant: string, vers: string) {
+  const retard = sitesEnRetard(plan, faites, avant);
+  if (!retard.length) return { plan, nb: 0 };
+  const ids = new Set(retard.map((e) => e.id));
+  const duJour = [...retard, ...plan.filter((e) => e.date === vers && !ids.has(e.id) && !faites.has(e.id))];
+  const { ordre } = await optimiser(duJour);
+  const faitsDuJour = plan.filter((e) => e.date === vers && faites.has(e.id)).length;
+  const maj = new Map(ordre.map((e, i) => [e.id, { ...e, date: vers, ordre: faitsDuJour + i + 1, ordreAuto: true }]));
+  return { plan: plan.map((e) => maj.get(e.id) ?? e), nb: retard.length };
 }

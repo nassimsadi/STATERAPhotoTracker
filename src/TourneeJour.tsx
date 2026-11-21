@@ -4,7 +4,7 @@ import { inverserParcours, optimiserDepuisPosition } from './actionsTournee';
 import { lienNavigation } from './itineraire';
 import { jourParDefaut, lienItineraire } from './Plan';
 import { ajouterJours, jourISO, libelleJour } from './plan';
-import { decalerTournee } from './planification';
+import { decalerTournee, reporterSites, sitesEnRetard } from './planification';
 import { avancement } from './regroupement';
 import type { EtapePlan, PhotoRecord } from './types';
 
@@ -63,6 +63,21 @@ export default function TourneeJour({ plan, photos, onMajPlan, onPhotographier, 
       setCalcul(null);
     }
   };
+  // Sites des jours passés restés non faits
+  const faitesIds = new Set(photos.map((p) => p.etapeId).filter(Boolean) as string[]);
+  const enRetard = sitesEnRetard(plan, faitesIds, aujourdhui);
+  const rattraper = async () => {
+    setCalcul('Ajout des sites en retard à la tournée d\'aujourd\'hui…');
+    try {
+      const r = await reporterSites(plan, faitesIds, aujourdhui, aujourdhui);
+      onMajPlan(r.plan);
+      setJour(aujourdhui);
+      setInfo({ txt: `${r.nb} site(s) en retard ajouté(s) en tête de la tournée d'aujourd'hui. Itinéraire recalculé.`, cls: 'vert' });
+    } finally {
+      setCalcul(null);
+    }
+  };
+
   /** Décale la tournée du jour au lendemain (et les suivantes d'un jour). */
   const decaler = () => {
     const faites = new Set(photos.map((p) => p.etapeId).filter(Boolean) as string[]);
@@ -92,6 +107,12 @@ export default function TourneeJour({ plan, photos, onMajPlan, onPhotographier, 
         <button className="rond" disabled={!suivante} onClick={() => suivante && setJour(suivante)} aria-label="Tournée suivante">›</button>
       </div>
 
+      {enRetard.length > 0 && (
+        <div className="alerte orange retard">
+          ⚠️ <b>{enRetard.length} site(s) en retard</b> : non faits lors des tournées précédentes.
+          <button className="btn plein petit" disabled={!!calcul} onClick={rattraper}>Ajouter à la tournée d'aujourd'hui</button>
+        </div>
+      )}
       <div className="avancement-compact">
         <div className="barre-fond"><div className={`barre-plein ${st.pct === 100 ? 'complet' : ''}`} style={{ width: `${st.pct}%` }} /></div>
         <span className="pct">{st.pct} % · {st.faites}/{st.total} sites</span>
