@@ -31,45 +31,50 @@ export function joursFeries(a: number): Set<string> {
   ]);
 }
 
-export function estOuvre(jour: string, samedi: boolean): boolean {
+/** Jours travaillés : samedi et dimanche au choix, jours fériés au choix. */
+export type JoursTravailles = { samedi: boolean; dimanche: boolean; feries: boolean };
+export const TOUS_LES_JOURS: JoursTravailles = { samedi: true, dimanche: true, feries: false };
+
+export function estOuvre(jour: string, t: JoursTravailles): boolean {
   const j = depuisISO(jour).getDay();
-  if (j === 0 || (j === 6 && !samedi)) return false;
-  return !joursFeries(Number(jour.slice(0, 4))).has(jour);
+  if ((j === 6 && !t.samedi) || (j === 0 && !t.dimanche)) return false;
+  return t.feries || !joursFeries(Number(jour.slice(0, 4))).has(jour);
 }
 
 /** Premier jour ouvré à partir de `jour` (inclus). */
-export function prochainOuvre(jour: string, samedi: boolean): string {
+export function prochainOuvre(jour: string, t: JoursTravailles): string {
   let d = jour;
-  for (let i = 0; i < 30 && !estOuvre(d, samedi); i++) d = ajouterJours(d, 1);
+  for (let i = 0; i < 30 && !estOuvre(d, t); i++) d = ajouterJours(d, 1);
   return d;
 }
 
 /** Date de début proposée : le jour ouvré suivant la dernière journée du plan (au plus tôt demain). */
-export function debutPropose(plan: EtapePlan[], samedi: boolean): string {
+export function debutPropose(plan: EtapePlan[], t: JoursTravailles): string {
   const demain = ajouterJours(jourISO(new Date()), 1);
   const derniere = plan.map((e) => e.date).filter(Boolean).sort().pop();
   const apres = derniere && derniere >= demain ? ajouterJours(derniere, 1) : demain;
-  return prochainOuvre(apres, samedi);
+  return prochainOuvre(apres, t);
 }
 
-export type OptionsDates = { debut: string; parJour: number; samedi: boolean };
+export const MIN_SITES_PAR_JOUR = 30;
+export type OptionsDates = { debut: string; parJour: number; jours: JoursTravailles };
 
 /**
  * Attribue une date aux étapes sans date : on les ordonne selon l'itinéraire optimal (sites proches à la suite),
- * puis on les répartit par paquets de `parJour` sur les jours ouvrés à partir de `debut`.
+ * puis on les répartit par paquets de `parJour` (30 au minimum) sur les jours travaillés à partir de `debut`.
  * Les étapes doivent déjà être localisées (latitude / longitude) pour un regroupement géographique.
  */
 export async function calculerDates(etapes: EtapePlan[], o: OptionsDates): Promise<{ etapes: EtapePlan[]; jours: string[] }> {
   if (!etapes.length) return { etapes, jours: [] };
   const { ordre } = await optimiser(etapes);
-  const parJour = Math.max(1, Math.floor(o.parJour));
+  const parJour = Math.max(MIN_SITES_PAR_JOUR, Math.floor(o.parJour));
   const res: EtapePlan[] = [];
   const jours: string[] = [];
-  let jour = prochainOuvre(o.debut, o.samedi);
+  let jour = prochainOuvre(o.debut, o.jours);
   for (let i = 0; i < ordre.length; i += parJour) {
     jours.push(jour);
     ordre.slice(i, i + parJour).forEach((e, k) => res.push({ ...e, date: jour, ordre: k + 1, ordreAuto: true }));
-    jour = prochainOuvre(ajouterJours(jour, 1), o.samedi);
+    jour = prochainOuvre(ajouterJours(jour, 1), o.jours);
   }
   return { etapes: res, jours };
 }

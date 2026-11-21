@@ -3,7 +3,7 @@ import { ajouterJours, jourISO, libelleJour, lundi } from './plan';
 import { importerFichierPlan } from './importPlan';
 import { avancement } from './regroupement';
 import { localiserEtapes, optimiserParJour } from './itineraire';
-import { calculerDates, debutPropose, estDoublon } from './planification';
+import { calculerDates, debutPropose, estDoublon, MIN_SITES_PAR_JOUR, TOUS_LES_JOURS, type JoursTravailles } from './planification';
 import type { EtapePlan, PhotoRecord } from './types';
 
 type Props = {
@@ -36,8 +36,8 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
   const [mode, setMode] = useState<'ajouter' | 'remplacer'>('ajouter');
   const [autoDates, setAutoDates] = useState(true);
   const [parJour, setParJour] = useState(30);
-  const [samedi, setSamedi] = useState(false);
-  const [debut, setDebut] = useState(() => debutPropose(plan, false));
+  const [jours, setJours] = useState<JoursTravailles>(TOUS_LES_JOURS);
+  const [debut, setDebut] = useState(() => debutPropose(plan, TOUS_LES_JOURS));
 
   const importer = async (f?: File) => {
     if (!f) return;
@@ -49,7 +49,7 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
       if (!plan.length && etapes.every((e) => e.date)) return appliquerImport(etapes, 'remplacer', false);
       setMode(plan.length ? 'ajouter' : 'remplacer');
       setAutoDates(true);
-      setDebut(debutPropose(plan.length ? plan : [], samedi));
+      setDebut(debutPropose(plan.length ? plan : [], jours));
       setAttente({ etapes, nomFichier: f.name });
     } catch (e) {
       setCalcul(null);
@@ -71,7 +71,7 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
       let joursCalcules: string[] = [];
       if (dates && localisees.some((e) => !e.date)) {
         setCalcul('Calcul des dates de passage…');
-        const r = await calculerDates(localisees.filter((e) => !e.date), { debut, parJour, samedi });
+        const r = await calculerDates(localisees.filter((e) => !e.date), { debut, parJour, jours });
         localisees = [...localisees.filter((e) => e.date), ...r.etapes];
         joursCalcules = r.jours;
       }
@@ -88,7 +88,7 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
         txt: (m === 'ajouter' ? `Plan complété : ${localisees.length} site(s) ajouté(s)` : `Plan importé : ${localisees.length} site(s)`)
           + (doublons.length ? `, ${doublons.length} déjà présent(s) ignoré(s)` : '')
           + (dts.length ? (dts[0] === dts[dts.length - 1] ? `, le ${libelleJour(dts[0])}` : `, du ${libelleJour(dts[0])} au ${libelleJour(dts[dts.length - 1])}`) : '')
-          + (joursCalcules.length ? ` · dates calculées sur ${joursCalcules.length} jour(s) ouvré(s)` : '')
+          + (joursCalcules.length ? ` · dates calculées sur ${joursCalcules.length} jour(s) de tournée` : '')
           + (sansDate ? ` · ${sansDate} sans date (affichées chaque jour)` : '')
           + (source === 'vol d\'oiseau' ? ' · ordre approximatif (calcul routier indisponible)' : ' · ordre de passage optimisé par la route')
           + (nonLoc ? ` · ${nonLoc} adresse(s) introuvable(s), à vérifier` : ''),
@@ -105,7 +105,7 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
     const doublons = mode === 'ajouter' ? fichier.filter((e) => estDoublon(e, plan)).length : 0;
     const aAjouter = fichier.length - doublons;
     const sansDate = (mode === 'ajouter' ? fichier.filter((e) => !estDoublon(e, plan)) : fichier).filter((e) => !e.date).length;
-    const nbJours = Math.ceil(sansDate / Math.max(1, parJour));
+    const nbJours = Math.ceil(sansDate / Math.max(MIN_SITES_PAR_JOUR, parJour));
     return (
       <div className="carte panneau-import">
         <h3>Importer « {attente.nomFichier} »</h3>
@@ -121,19 +121,25 @@ export default function Plan({ plan, photos, onImporter, onPhotographier, onSign
         {sansDate > 0 && (
           <div className="dates-auto">
             <label className="case"><input type="checkbox" checked={autoDates} onChange={(e) => setAutoDates(e.target.checked)} />
-              <span><b>Calculer automatiquement les dates</b><small>{sansDate} site(s) sans date : regroupés par proximité et répartis sur les jours ouvrés (week-ends et jours fériés exclus).</small></span></label>
+              <span><b>Calculer automatiquement les dates</b><small>{sansDate} site(s) sans date : regroupés par proximité et répartis jour par jour.</small></span></label>
             {autoDates && (
               <div className="ligne-champs">
-                <label className="champ" style={{ flex: 1 }}><span>Sites par jour</span>
-                  <input type="number" min={1} max={200} inputMode="numeric" value={parJour} onChange={(e) => setParJour(Math.max(1, Number(e.target.value) || 1))} /></label>
+                <label className="champ" style={{ flex: 1 }}><span>Sites par jour (min. {MIN_SITES_PAR_JOUR})</span>
+                  <input type="number" min={MIN_SITES_PAR_JOUR} max={300} inputMode="numeric" value={parJour}
+                    onChange={(e) => setParJour(Number(e.target.value) || MIN_SITES_PAR_JOUR)}
+                    onBlur={() => setParJour((v) => Math.min(300, Math.max(MIN_SITES_PAR_JOUR, v)))} /></label>
                 <label className="champ" style={{ flex: 1.3 }}><span>À partir du</span>
                   <input type="date" value={debut} onChange={(e) => e.target.value && setDebut(e.target.value)} /></label>
               </div>
             )}
             {autoDates && (
-              <label className="case"><input type="checkbox" checked={samedi} onChange={(e) => setSamedi(e.target.checked)} /><span>Inclure le samedi</span></label>
+              <div className="jours-travailles">
+                <label className="case"><input type="checkbox" checked={jours.samedi} onChange={(e) => setJours({ ...jours, samedi: e.target.checked })} /><span>Samedi travaillé</span></label>
+                <label className="case"><input type="checkbox" checked={jours.dimanche} onChange={(e) => setJours({ ...jours, dimanche: e.target.checked })} /><span>Dimanche travaillé</span></label>
+                <label className="case"><input type="checkbox" checked={jours.feries} onChange={(e) => setJours({ ...jours, feries: e.target.checked })} /><span>Jours fériés travaillés</span></label>
+              </div>
             )}
-            {autoDates && <p className="aide">≈ {nbJours} jour(s) de tournée à partir du {libelleJour(debut)}.</p>}
+            {autoDates && <p className="aide">≈ {nbJours} jour(s) de tournée à partir du {libelleJour(debut)}</p>}
           </div>
         )}
         <div className="actions">

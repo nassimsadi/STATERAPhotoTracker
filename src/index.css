@@ -287,3 +287,4 @@ h1, h2, h3, h4 { margin: 0; }
 .panneau-import .case span { display: flex; flex-direction: column; gap: 2px; }
 .panneau-import .case small { color: var(--gris); font-size: 13px; }
 .case input[type=radio] { width: 20px; height: 20px; accent-color: var(--sarcelle); flex: none; margin-top: 1px; }
+.jours-travailles { display: flex; flex-wrap: wrap; gap: 4px 18px; }
