@@ -4,8 +4,9 @@ import { codeDepartementDepuisCP, libelleDepartement } from './departements';
 export type Position = { latitude: number; longitude: number; precision: number; horodatage: number };
 
 /** Écart toléré entre les coordonnées de l'adresse et la position du smartphone. */
-export const SEUIL_CONFORMITE_M = 150;
-export const tolerance = (precision: number | null) => SEUIL_CONFORMITE_M + Math.min(precision ?? 0, 50);
+export const SEUIL_CONFORMITE_M = 50;
+/** Tolérance fixe : la photo doit être prise à 50 m au plus de l'adresse de la feuille de route. */
+export const tolerance = (_precision: number | null) => SEUIL_CONFORMITE_M;
 
 const versPosition = (p: GeolocationPosition): Position => ({
   latitude: p.coords.latitude, longitude: p.coords.longitude, precision: p.coords.accuracy, horodatage: p.timestamp,

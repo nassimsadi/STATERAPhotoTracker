@@ -170,7 +170,9 @@ export default function Capture({ etape, signalementInitial, onEnregistree, onFe
 
   const etatGps = erreurGps && !position ? { txt: erreurGps, cls: 'rouge' }
     : !position ? { txt: 'Recherche GPS…', cls: 'orange' }
-    : { txt: `GPS actif ±${Math.round(position.precision)} m`, cls: position.precision <= 30 ? 'vert' : 'orange' };
+    : position.precision > 50
+      ? { txt: `GPS imprécis ±${Math.round(position.precision)} m : attendez un meilleur signal (tolérance 50 m)`, cls: 'orange' }
+      : { txt: `GPS actif ±${Math.round(position.precision)} m`, cls: 'vert' };
 
   return (
     <div className="ecran">
